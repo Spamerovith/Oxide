@@ -1,4 +1,4 @@
-//! Цветовые темы и метрики. Значения описаны в DESIGN.md — меняются только вместе.
+//! Цветовые темы и метрики. Значения описаны в DESIGN.md - меняются только вместе
 
 use egui::{Color32, CornerRadius, Stroke, Visuals};
 use serde::{Deserialize, Serialize};
@@ -27,8 +27,8 @@ impl ThemeChoice {
     pub fn title(self) -> &'static str {
         match self {
             ThemeChoice::System => "Как в Windows",
-            ThemeChoice::Light => "Windows 11 — светлая",
-            ThemeChoice::Dark => "Windows 11 — тёмная",
+            ThemeChoice::Light => "Windows 11 - светлая",
+            ThemeChoice::Dark => "Windows 11 - тёмная",
             ThemeChoice::Oxide => "Oxide",
             ThemeChoice::Graphite => "Графит",
             ThemeChoice::Nordic => "Северная ночь",
@@ -65,7 +65,7 @@ pub struct Palette {
     pub danger: Color32,
     pub focus: Color32,
     pub bar_track: Color32,
-    /// Рамка выделения мышью (базовый системный акцент).
+    /// Рамка выделения мышью (базовый системный акцент)
     pub marquee: Color32,
 }
 
@@ -142,7 +142,7 @@ impl Palette {
         }
     }
 
-    /// Oxide — тёплый графит, ржаво-медный акцент.
+    /// Oxide - тёплый графит, ржаво-медный акцент
     pub fn oxide() -> Self {
         let mut p = Palette::dark(None);
         p.base = hex(0x1E1B19);
@@ -171,7 +171,7 @@ impl Palette {
         p
     }
 
-    /// Графит — чёрный холст для OLED.
+    /// Графит - чёрный холст для OLED
     pub fn graphite(accent: Option<[Color32; 8]>) -> Self {
         let mut p = Palette::dark(accent);
         p.base = hex(0x000000);
@@ -190,7 +190,7 @@ impl Palette {
         p
     }
 
-    /// Северная ночь — сине-сланцевый тёмный.
+    /// Северная ночь - сине-сланцевый тёмный
     pub fn nordic() -> Self {
         let mut p = Palette::dark(None);
         p.base = hex(0x1B2029);
@@ -219,7 +219,7 @@ impl Palette {
         p
     }
 
-    /// Бумага — тёплый светлый.
+    /// Бумага - тёплый светлый
     pub fn paper() -> Self {
         let mut p = Palette::light(None);
         p.base = hex(0xF4F1EA);
@@ -266,8 +266,8 @@ impl Palette {
         }
     }
 
-    /// Полупрозрачный слой поверх текущей подложки → непрозрачный цвет.
-    /// Смешивание в гамма-пространстве, как в WinUI (egui на sRGB-буфере смешивает линейно, слишком светло).
+    /// Полупрозрачный слой поверх текущей подложки → непрозрачный цвет
+    /// Смешивание в гамма-пространстве, как в WinUI (egui на sRGB-буфере смешивает линейно, слишком светло)
     pub fn fill(&self, overlay: Color32) -> Color32 {
         let [r, g, b, a] = overlay.to_srgba_unmultiplied();
         if a == 255 {
@@ -279,13 +279,13 @@ impl Palette {
         Color32::from_rgb(mix(r, bg.r()), mix(g, bg.g()), mix(b, bg.b()))
     }
 
-    /// Полупрозрачная заливка рамки выделения: файлы под ней остаются видны.
+    /// Полупрозрачная заливка рамки выделения: файлы под ней остаются видны
     pub fn marquee_fill(&self) -> Color32 {
         let c = self.marquee;
         Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), if self.dark { 40 } else { 45 })
     }
 
-    /// Цвет акцента, читаемый как текст на подложке (ссылки, выбранные пункты).
+    /// Цвет акцента, читаемый как текст на подложке (ссылки, выбранные пункты)
     pub fn accent_text(&self) -> Color32 {
         self.accent
     }
@@ -295,12 +295,12 @@ thread_local! {
     static SURFACE: std::cell::Cell<Color32> = const { std::cell::Cell::new(Color32::from_rgb(0x20, 0x20, 0x20)) };
 }
 
-/// Текущая подложка, над которой рисуются подсветки.
+/// Текущая подложка, над которой рисуются подсветки
 pub fn set_surface(c: Color32) {
     SURFACE.with(|s| s.set(c));
 }
 
-/// Метрики при 100 % (логические пиксели = DIP).
+/// Метрики при 100 % (логические пиксели = DIP)
 pub mod m {
     pub const TITLE_H: f32 = 40.0;
     pub const TAB_H: f32 = 32.0;
@@ -328,7 +328,7 @@ pub mod m {
     pub const SEARCH_W: f32 = 220.0;
 }
 
-/// Читает системную палитру акцента (8 цветов: Light3..Dark3).
+/// Читает системную палитру акцента (8 цветов: Light3..Dark3)
 pub fn system_accent_palette() -> Option<[Color32; 8]> {
     let data = crate::util::reg_read_binary(
         windows::Win32::System::Registry::HKEY_CURRENT_USER,

@@ -1,4 +1,4 @@
-//! Область сведений и область просмотра справа.
+//! Область сведений и область просмотра справа
 
 use egui::{Align2, CornerRadius, Pos2, Rect, Ui, Vec2};
 
@@ -16,7 +16,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let pal = app.pal.clone();
     let ctx = ui.ctx().clone();
     let rect = ui.max_rect();
-    // Тонкая линия-граница слева.
+    // Тонкая линия-граница слева
     ui.painter().line_segment([Pos2::new(rect.left() + 0.5, rect.top()), Pos2::new(rect.left() + 0.5, rect.bottom())], egui::Stroke::new(1.0, pal.divider));
     let mode = app.settings.pane;
     let sel: Vec<_> = app.tab().selected_entries().into_iter().cloned().collect();
@@ -26,7 +26,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
         ui.add_space(16.0);
         if sel.is_empty() {
             let t = app.tab();
-            let msg = if mode == PaneMode::Preview { "Выберите файл для предварительного просмотра." } else { "Выберите один файл, чтобы получить сведения о нём." };
+            let msg = if mode == PaneMode::Preview { "Выберите файл для предварительного просмотра" } else { "Выберите один файл, чтобы получить сведения о нём" };
             ui.horizontal(|ui| {
                 ui.add_space(16.0);
                 ui.label(egui::RichText::new(msg).font(font(12.0)).color(pal.text2));

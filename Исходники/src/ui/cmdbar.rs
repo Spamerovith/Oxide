@@ -1,4 +1,4 @@
-//! Командная панель, как в Проводнике Windows 11.
+//! Командная панель, как в Проводнике Windows 11
 
 use egui::{Id, Pos2, Rect, Ui, Vec2};
 
@@ -13,7 +13,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let rect = ui.max_rect();
     let pal = app.pal.clone();
     let ctx = ui.ctx().clone();
-    // Линии сверху и снизу командной панели.
+    // Линии сверху и снизу командной панели
     hline(ui.painter(), rect.top() - 0.5, rect.left(), rect.right(), pal.divider);
     hline(ui.painter(), rect.bottom() - 1.0, rect.left(), rect.right(), pal.divider);
     let cy = rect.center().y;
@@ -92,7 +92,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
         app.open_popup(Popup::below(id, r, items, now(&ctx)));
     }
 
-    // «Сведения» справа.
+    // «Сведения» справа
     let label = "Сведения";
     let w = 12.0 + 16.0 + 8.0 + text_width(ui, label, font(14.0)) + 12.0;
     let sx = rect.right() - 16.0 - w;

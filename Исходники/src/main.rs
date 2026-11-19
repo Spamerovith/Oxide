@@ -1,5 +1,5 @@
 #![windows_subsystem = "windows"]
-//! Oxide — быстрый и лёгкий проводник для Windows в стиле Проводника Windows 11.
+//! Oxide - быстрый и лёгкий проводник для Windows в стиле Проводника Windows 11
 
 mod app;
 mod cmd;

@@ -1,4 +1,4 @@
-//! Файловая система: быстрый список папки, диски, типы файлов, отображаемые имена.
+//! Файловая система: быстрый список папки, диски, типы файлов, отображаемые имена
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -26,9 +26,9 @@ pub const ATTR_REPARSE: u32 = FILE_ATTRIBUTE_REPARSE_POINT.0;
 
 #[derive(Clone, Debug)]
 pub struct Entry {
-    /// Имя на диске.
+    /// Имя на диске
     pub name: String,
-    /// Имя для показа (локализованное, без расширения при необходимости).
+    /// Имя для показа (локализованное, без расширения при необходимости)
     pub display: String,
     pub path: PathBuf,
     pub is_dir: bool,
@@ -36,13 +36,13 @@ pub struct Entry {
     pub mtime: u64,
     pub ctime: u64,
     pub attrs: u32,
-    /// Расширение в нижнем регистре без точки.
+    /// Расширение в нижнем регистре без точки
     pub ext: String,
-    /// Для элементов оболочки (Корзина, Сеть): строка разбора.
+    /// Для элементов оболочки (Корзина, Сеть): строка разбора
     pub shell: Option<String>,
-    /// Для результатов поиска и «Последних»: папка, где лежит элемент.
+    /// Для результатов поиска и «Последних»: папка, где лежит элемент
     pub location: Option<String>,
-    /// Доп. столбец (Корзина: исходное расположение; Последние: дата открытия).
+    /// Доп. столбец (Корзина: исходное расположение; Последние: дата открытия)
     pub extra: Option<String>,
     pub type_name: Option<String>,
 }
@@ -69,7 +69,7 @@ pub fn ext_of(name: &str) -> String {
     }
 }
 
-/// Расширения, которые Проводник не показывает никогда (NeverShowExt).
+/// Расширения, которые Проводник не показывает никогда (NeverShowExt)
 pub fn never_show_ext(ext: &str) -> bool {
     matches!(ext, "lnk" | "url" | "pif" | "appref-ms" | "library-ms" | "searchconnector-ms")
 }
@@ -100,7 +100,7 @@ fn ft(f: &windows::Win32::Foundation::FILETIME) -> u64 {
     ((f.dwHighDateTime as u64) << 32) | f.dwLowDateTime as u64
 }
 
-/// Перебирает содержимое папки системным вызовом (быстро, без лишних stat).
+/// Перебирает содержимое папки системным вызовом (быстро, без лишних stat)
 pub fn for_each_child(dir: &Path, mut f: impl FnMut(&str, u32, u64, u64, u64)) -> Result<(), String> {
     let pat = long_path(&dir.join("*"));
     let w = wide_path(&pat);
@@ -141,13 +141,13 @@ pub fn for_each_child(dir: &Path, mut f: impl FnMut(&str, u32, u64, u64, u64)) -
 
 pub fn error_text(code: u32) -> String {
     if code == ERROR_ACCESS_DENIED.0 {
-        "Отказано в доступе.".into()
+        "Отказано в доступе".into()
     } else if code == ERROR_PATH_NOT_FOUND.0 || code == ERROR_FILE_NOT_FOUND.0 {
-        "Расположение недоступно: путь не найден.".into()
+        "Расположение недоступно: путь не найден".into()
     } else {
         let msg = windows::core::Error::from(windows::core::HRESULT::from_win32(code)).message();
         if msg.is_empty() {
-            format!("Ошибка {code}.")
+            format!("Ошибка {code}")
         } else {
             msg
         }
@@ -182,7 +182,7 @@ pub fn list_dir(dir: &Path, o: &ListOptions) -> Result<Vec<Entry>, String> {
             type_name: None,
         });
     })?;
-    // Локализованные имена особых папок (Загрузки, Документы...).
+    // Локализованные имена особых папок (Загрузки, Документы...)
     for e in out.iter_mut() {
         if e.customized_dir() && e.path.join("desktop.ini").exists() {
             if let Some(d) = shell_display_name(&e.path) {
@@ -195,7 +195,7 @@ pub fn list_dir(dir: &Path, o: &ListOptions) -> Result<Vec<Entry>, String> {
     Ok(out)
 }
 
-/// Сведения об одном файле (для результатов поиска).
+/// Сведения об одном файле (для результатов поиска)
 pub fn stat_entry(path: &Path, o: &ListOptions) -> Option<Entry> {
     let w = wide_path(&long_path(path));
     let mut d = WIN32_FILE_ATTRIBUTE_DATA::default();
@@ -254,7 +254,7 @@ pub fn shell_display_name(path: &Path) -> Option<String> {
 
 static TYPE_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
 
-/// Название типа («Текстовый документ», «Папка с файлами»), кэш по расширению.
+/// Название типа («Текстовый документ», «Папка с файлами»), кэш по расширению
 pub fn type_name(ext: &str, is_dir: bool) -> String {
     let key = if is_dir { "<dir>".to_string() } else { ext.to_string() };
     let cache = TYPE_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
@@ -303,7 +303,7 @@ pub const DRIVE_FIXED: u32 = 3;
 pub const DRIVE_REMOTE: u32 = 4;
 pub const DRIVE_CDROM: u32 = 5;
 
-/// Список дисков; `with_space` — опрашивать свободное место (может ждать сетевые диски).
+/// Список дисков; `with_space` - опрашивать свободное место (может ждать сетевые диски)
 pub fn drives(with_space: bool) -> Vec<Drive> {
     let mask = unsafe { GetLogicalDrives() };
     let mut out = vec![];
@@ -329,7 +329,7 @@ pub fn drives(with_space: bool) -> Vec<Drive> {
     out
 }
 
-/// Путь известной папки по GUID.
+/// Путь известной папки по GUID
 pub fn known_folder(id: &GUID) -> Option<PathBuf> {
     unsafe {
         let p = SHGetKnownFolderPath(id, KF_FLAG_DEFAULT, None).ok()?;
@@ -385,7 +385,7 @@ pub fn is_dir(p: &Path) -> bool {
     }
 }
 
-/// Только подпапки (для дерева навигации).
+/// Только подпапки (для дерева навигации)
 pub fn subdirs(dir: &Path, show_hidden: bool) -> Vec<(String, PathBuf)> {
     let mut v = vec![];
     let _ = for_each_child(dir, |name, attrs, _, _, _| {

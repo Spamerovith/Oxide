@@ -1,4 +1,4 @@
-//! Страницы «Главная» (Быстрый доступ + Последние) и «Этот компьютер» (диски).
+//! Страницы «Главная» (Быстрый доступ + Последние) и «Этот компьютер» (диски)
 
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -22,7 +22,7 @@ thread_local! {
 fn selected(key: &str) -> bool {
     SEL.with(|s| s.borrow().contains(key))
 }
-/// Щелчок по плитке: Ctrl — добавить/убрать, иначе выбрать только её.
+/// Щелчок по плитке: Ctrl - добавить/убрать, иначе выбрать только её
 fn select(key: &str) {
     let ctrl = CTRL.with(|c| c.get());
     SEL.with(|s| {
@@ -37,7 +37,7 @@ fn select(key: &str) {
         }
     });
 }
-/// Правый щелчок: если плитка не выбрана — выбрать только её.
+/// Правый щелчок: если плитка не выбрана - выбрать только её
 fn select_for_menu(key: &str) {
     SEL.with(|s| {
         let mut s = s.borrow_mut();
@@ -55,7 +55,7 @@ thread_local! {
     static CTRL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-/// Фон страницы: щелчок по пустому месту снимает выделение, протягивание — рамка выделения.
+/// Фон страницы: щелчок по пустому месту снимает выделение, протягивание - рамка выделения
 fn page_begin(ui: &mut Ui, id: &str) -> egui::Response {
     TILES.with(|t| t.borrow_mut().clear());
     CTRL.with(|c| c.set(ui.input(|i| i.modifiers.ctrl)));
@@ -114,7 +114,7 @@ fn page_end(ui: &mut Ui, bg: &egui::Response, pal: &crate::theme::Palette) {
     }
 }
 
-/// Заголовок раздела со сворачиванием. Возвращает true, если раздел развёрнут.
+/// Заголовок раздела со сворачиванием. Возвращает true, если раздел развёрнут
 fn section(app: &OxideApp, ui: &mut Ui, title: &'static str) -> bool {
     let pal = &app.pal;
     let w = ui.available_width();
@@ -224,7 +224,7 @@ pub fn home(app: &mut OxideApp, ui: &mut Ui) {
                     let w = ui.available_width();
                     let c_name = (w * 0.45).max(220.0);
                     let c_date = 160.0;
-                    // Заголовки.
+                    // Заголовки
                     let (hr, _) = ui.allocate_exact_size(Vec2::new(w, m::HEADER_H), Sense::hover());
                     let cy = hr.center().y;
                     ui.painter().text(Pos2::new(hr.left() + 12.0, cy), Align2::LEFT_CENTER, "Имя", font(12.0), pal.text2);
@@ -232,7 +232,7 @@ pub fn home(app: &mut OxideApp, ui: &mut Ui) {
                     ui.painter().text(Pos2::new(hr.left() + c_name + c_date, cy), Align2::LEFT_CENTER, "Расположение", font(12.0), pal.text2);
                     if recent.is_empty() {
                         ui.add_space(8.0);
-                        ui.label(egui::RichText::new("Здесь появятся файлы, которые вы недавно открывали.").font(font(12.0)).color(pal.text2));
+                        ui.label(egui::RichText::new("Здесь появятся файлы, которые вы недавно открывали").font(font(12.0)).color(pal.text2));
                     }
                     let row_h = if app.settings.compact { m::ROW_H_COMPACT } else { m::ROW_H };
                     for e in recent.iter() {

@@ -1,4 +1,4 @@
-//! Область навигации: Главная, Галерея, закреплённые папки, Этот компьютер, Сеть.
+//! Область навигации: Главная, Галерея, закреплённые папки, Этот компьютер, Сеть
 
 use std::path::PathBuf;
 
@@ -183,7 +183,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
                 let cresp = ui.interact(cr, Id::new(("nav-chev", i, &row.key)), Sense::click());
                 let ang = ctx.animate_bool_with_time(Id::new(("nav-rot", &row.key)), expanded, if app.animations { m::T_MENU } else { 0.0 });
                 let col = if cresp.hovered() { pal.text } else { pal.text3 };
-                // Шеврон поворачивается при раскрытии.
+                // Шеврон поворачивается при раскрытии
                 let c = cr.center();
                 let s = 3.5;
                 let rot = |v: Vec2| {

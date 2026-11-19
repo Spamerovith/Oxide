@@ -1,5 +1,5 @@
 //! Настройки Oxide. При первом запуске берутся из параметров Проводника пользователя,
-//! чтобы всё выглядело так же (скрытые файлы, расширения, куда открывать).
+//! чтобы всё выглядело так же (скрытые файлы, расширения, куда открывать)
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -54,6 +54,7 @@ pub struct Settings {
     pub show_frequent: bool,
     pub restore_tabs: bool,
     pub last_tabs: Vec<String>,
+    pub show_about_on_start: bool,
 }
 
 impl Default for Settings {
@@ -81,6 +82,7 @@ impl Default for Settings {
             show_frequent: true,
             restore_tabs: false,
             last_tabs: vec![],
+            show_about_on_start: true,
         }
     }
 }
@@ -102,7 +104,7 @@ impl Settings {
         Self::from_explorer()
     }
 
-    /// Начальные значения из настроек Проводника Windows.
+    /// Начальные значения из настроек Проводника Windows
     pub fn from_explorer() -> Self {
         let mut s = Settings::default();
         let adv = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced";

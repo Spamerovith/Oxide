@@ -1,4 +1,4 @@
-//! Системные значки и эскизы через IShellItemImageFactory в фоновых потоках.
+//! Системные значки и эскизы через IShellItemImageFactory в фоновых потоках
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Condvar, Mutex};
@@ -43,7 +43,7 @@ pub struct IconCache {
     frame: u64,
 }
 
-/// Расширения, для которых в крупных видах показывается эскиз.
+/// Расширения, для которых в крупных видах показывается эскиз
 pub fn thumbable(ext: &str) -> bool {
     matches!(
         ext,
@@ -53,7 +53,7 @@ pub fn thumbable(ext: &str) -> bool {
     )
 }
 
-/// Расширения, у которых свой значок у каждого файла.
+/// Расширения, у которых свой значок у каждого файла
 pub fn per_file_icon(ext: &str) -> bool {
     matches!(ext, "exe" | "ico" | "lnk" | "url" | "cur" | "ani" | "scr" | "msc" | "appref-ms" | "cpl" | "library-ms")
 }
@@ -77,7 +77,7 @@ impl IconCache {
         IconCache { shared, map: HashMap::new(), queued: HashSet::new(), frame: 0 }
     }
 
-    /// Вызывать раз в кадр: забирает готовые картинки и создаёт текстуры.
+    /// Вызывать раз в кадр: забирает готовые картинки и создаёт текстуры
     pub fn pump(&mut self, ctx: &egui::Context) {
         self.frame += 1;
         let done: Vec<_> = std::mem::take(&mut *self.shared.done.lock().unwrap());
@@ -89,14 +89,14 @@ impl IconCache {
             };
             self.map.insert(key, (slot, self.frame));
         }
-        // Освобождаем давно не показанные эскизы.
+        // Освобождаем давно не показанные эскизы
         if self.map.len() > 1500 && self.frame % 120 == 0 {
             let f = self.frame;
             self.map.retain(|k, (_, last)| !k.0.contains('\\') || f - *last < 600);
         }
     }
 
-    /// Возвращает текстуру значка; если её ещё нет — ставит в очередь.
+    /// Возвращает текстуру значка; если её ещё нет - ставит в очередь
     pub fn get(&mut self, key: &str, path: &str, px: u32, thumb: bool) -> Option<&TextureHandle> {
         let k = (key.to_string(), px);
         let frame = self.frame;
@@ -125,7 +125,7 @@ impl IconCache {
         matches!(self.map.get(&(key.to_string(), px)), Some((Slot::Failed, _)))
     }
 
-    /// Сбрасывает значки конкретных файлов (после изменения).
+    /// Сбрасывает значки конкретных файлов (после изменения)
     pub fn invalidate_path(&mut self, path: &str) {
         self.map.retain(|k, _| k.0 != path);
     }
@@ -201,6 +201,6 @@ pub unsafe fn hbitmap_to_image(hbmp: HBITMAP) -> Option<ColorImage> {
             p[3] = 255;
         }
     }
-    // Изображение уже с предумноженной альфой (DIB для AlphaBlend).
+    // Изображение уже с предумноженной альфой (DIB для AlphaBlend)
     Some(ColorImage::from_rgba_premultiplied([w as usize, h as usize], &buf))
 }

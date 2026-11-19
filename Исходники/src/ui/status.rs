@@ -1,4 +1,4 @@
-//! Строка состояния: «Элементов: N | Выбрано …» и переключатели вида справа.
+//! Строка состояния: «Элементов: N | Выбрано …» и переключатели вида справа
 
 use egui::{Align2, Id, Pos2, Rect, Ui, Vec2};
 
@@ -52,7 +52,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     }
     ui.painter().text(Pos2::new(rect.left() + 16.0, cy), Align2::LEFT_CENTER, text, font(12.0), pal.text);
 
-    // Таблица / Крупные значки — как две кнопки в правом нижнем углу Проводника.
+    // Таблица / Крупные значки - как две кнопки в правом нижнем углу Проводника
     let view = app.tab().view.view;
     let r2 = Rect::from_center_size(Pos2::new(rect.right() - 20.0, cy), Vec2::new(24.0, 22.0));
     let r1 = r2.translate(Vec2::new(-28.0, 0.0));

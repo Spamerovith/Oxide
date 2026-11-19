@@ -1,4 +1,4 @@
-//! Сборка окна: полоса вкладок, строка адреса, командная панель, навигация, содержимое, строка состояния.
+//! Сборка окна: полоса вкладок, строка адреса, командная панель, навигация, содержимое, строка состояния
 
 pub mod addressbar;
 pub mod cmdbar;
@@ -82,7 +82,7 @@ pub fn frame(app: &mut OxideApp, ctx: &egui::Context) {
     });
 }
 
-/// Короткое уведомление внизу окна.
+/// Короткое уведомление внизу окна
 pub fn toast(app: &mut OxideApp, ctx: &egui::Context) {
     let Some((text, t0)) = app.toast.clone() else { return };
     let now = ctx.input(|i| i.time);

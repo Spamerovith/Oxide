@@ -1,4 +1,4 @@
-//! Виртуальные папки оболочки (Корзина, Сеть, Быстрый доступ, Галерея) через IEnumShellItems.
+//! Виртуальные папки оболочки (Корзина, Сеть, Быстрый доступ, Галерея) через IEnumShellItems
 
 use std::path::PathBuf;
 
@@ -97,7 +97,7 @@ pub fn enumerate(parsing: &str, show_ext: bool) -> Result<Vec<Entry>, String> {
                 }
             }
             if !is_bin && !e.is_dir && !show_ext {
-                // Отображаемое имя оболочки уже учитывает настройку расширений.
+                // Отображаемое имя оболочки уже учитывает настройку расширений
             }
             out.push(e);
         }
@@ -105,7 +105,7 @@ pub fn enumerate(parsing: &str, show_ext: bool) -> Result<Vec<Entry>, String> {
     }
 }
 
-/// Закреплённые и частые папки Быстрого доступа — те же, что в Проводнике.
+/// Закреплённые и частые папки Быстрого доступа - те же, что в Проводнике
 pub fn quick_access() -> Vec<(String, PathBuf, bool)> {
     use windows::Win32::UI::Shell::PropertiesSystem::PSGetPropertyKeyFromName;
     let mut out: Vec<(String, PathBuf, Option<bool>)> = vec![];
@@ -140,7 +140,7 @@ pub fn quick_access() -> Vec<(String, PathBuf, bool)> {
             out.push((display, path, pinned));
         }
     }
-    // Если свойство недоступно — закреплёнными считаем то, что Проводник отдаёт с глаголом «открепить».
+    // Если свойство недоступно - закреплёнными считаем то, что Проводник отдаёт с глаголом «открепить»
     out.into_iter()
         .map(|(d, p, pin)| {
             let pinned = pin.unwrap_or_else(|| super::menu::has_verb(&[p.to_string_lossy().to_string()], "unpinfromhome"));
@@ -149,7 +149,7 @@ pub fn quick_access() -> Vec<(String, PathBuf, bool)> {
         .collect()
 }
 
-/// Недавние файлы из папки Recent (ярлыки → цели).
+/// Недавние файлы из папки Recent (ярлыки → цели)
 pub fn recent_files(limit: usize) -> Vec<(PathBuf, u64)> {
     use windows::Win32::System::Com::{CoCreateInstance, IPersistFile, CLSCTX_INPROC_SERVER, STGM_READ};
     use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
@@ -187,7 +187,7 @@ pub fn recent_files(limit: usize) -> Vec<(PathBuf, u64)> {
     out
 }
 
-/// Цель ярлыка, если это папка.
+/// Цель ярлыка, если это папка
 pub fn shortcut_target(lnk: &std::path::Path) -> Option<PathBuf> {
     use windows::Win32::System::Com::{CoCreateInstance, IPersistFile, CLSCTX_INPROC_SERVER, STGM_READ};
     use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};

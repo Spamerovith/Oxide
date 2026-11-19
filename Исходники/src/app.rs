@@ -1,4 +1,4 @@
-//! Состояние приложения, вкладки, навигация, фоновые задачи и выполнение команд.
+//! Состояние приложения, вкладки, навигация, фоновые задачи и выполнение команд
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -402,7 +402,7 @@ impl OxideApp {
         app.refresh_drives(&ctx);
         app.load_quick(&ctx);
 
-        // Стартовое расположение.
+        // Стартовое расположение
         let mut select_file: Option<PathBuf> = None;
         let loc = match start {
             Some(a) if !a.is_empty() => {
@@ -429,6 +429,9 @@ impl OxideApp {
             app.active = 0;
         } else {
             app.open_tab(&ctx, loc, true);
+        }
+        if app.settings.show_about_on_start {
+            app.dialog = Some(Dialog::About);
         }
         if let Some(f) = select_file {
             app.tabs[app.active].reselect = Some(vec![f]);
@@ -498,7 +501,7 @@ impl OxideApp {
     }
 
     pub fn navigate_tab(&mut self, ctx: &egui::Context, ti: usize, loc: Location, push: bool) {
-        // Ярлык на папку → сама папка; путь к файлу → открыть папку и выделить файл.
+        // Ярлык на папку → сама папка; путь к файлу → открыть папку и выделить файл
         let mut loc = loc;
         let mut select: Option<PathBuf> = None;
         if let Location::Path(p) = &loc {
@@ -819,7 +822,7 @@ impl OxideApp {
                 Msg::RefreshAll => self.fs_dirty_all = true,
             }
         }
-        // Отложенное обновление после изменений на диске.
+        // Отложенное обновление после изменений на диске
         for ti in 0..self.tabs.len() {
             let due = self.tabs[ti].dirty_at.map(|d| t_now - d > 0.25).unwrap_or(false) || self.fs_dirty_all;
             if due && self.tabs[ti].rename.is_none() && self.tabs[ti].marquee.is_none() && !self.tabs[ti].searching() {
@@ -832,7 +835,7 @@ impl OxideApp {
             }
         }
         self.fs_dirty_all = false;
-        // Подключение/отключение дисков.
+        // Подключение/отключение дисков
         if t_now - self.drive_check > 2.0 {
             self.drive_check = t_now;
             let m = unsafe { windows::Win32::Storage::FileSystem::GetLogicalDrives() };
@@ -841,12 +844,12 @@ impl OxideApp {
             }
             ctx.request_repaint_after(std::time::Duration::from_secs(2));
         }
-        // Завершённые файловые операции.
+        // Завершённые файловые операции
         while let Ok(done) = self.ops.rx.try_recv() {
             if let Some(err) = done.error {
                 self.dialog = Some(Dialog::Message { title: "Не удалось выполнить операцию".into(), text: err });
             } else if done.ok && std::mem::take(&mut self.undo_pop_after) {
-                // Это была отмена — новую запись отмены не создаём.
+                // Это была отмена - новую запись отмены не создаём
             } else if done.ok {
                 match &done.op {
                     Op::Rename { path, new_name } => {
@@ -1021,7 +1024,7 @@ impl OxideApp {
         }
         let target = e.shell.clone().unwrap_or_else(|| e.path.to_string_lossy().to_string());
         if !smenu::open(&target) {
-            self.toast = Some((format!("Не удаётся открыть «{}».", e.display), now(ctx)));
+            self.toast = Some((format!("Не удаётся открыть «{}»", e.display), now(ctx)));
         }
     }
 
@@ -1055,7 +1058,7 @@ impl OxideApp {
                 self.ops.run(Op::Copy { src: files, dst: dir });
             }
         } else {
-            self.toast = Some(("В буфере обмена нет файлов.".into(), now(ctx)));
+            self.toast = Some(("В буфере обмена нет файлов".into(), now(ctx)));
         }
     }
 
@@ -1085,7 +1088,7 @@ impl OxideApp {
             return;
         }
         self.ops.run(Op::Rename { path: e.path.clone(), new_name: new.clone() });
-        // Мгновенно показываем новое имя, не дожидаясь диска.
+        // Мгновенно показываем новое имя, не дожидаясь диска
         let ext = if e.is_dir { String::new() } else { fs::ext_of(&new) };
         let show_ext = self.settings.show_ext;
         let ent = &mut self.tabs[a].entries[r.idx];
@@ -1129,7 +1132,7 @@ impl OxideApp {
 
     pub fn undo_last(&mut self, ctx: &egui::Context) {
         let Some(u) = self.undo.pop() else {
-            self.toast = Some(("Нечего отменять.".into(), now(ctx)));
+            self.toast = Some(("Нечего отменять".into(), now(ctx)));
             return;
         };
         match u {
@@ -1208,7 +1211,7 @@ impl OxideApp {
             Cmd::Share => {
                 let names = self.tab().selected_names();
                 if !names.is_empty() && !smenu::invoke_verb(&names, "Windows.ModernShare") {
-                    self.toast = Some(("Общий доступ для этих элементов недоступен.".into(), now(ctx)));
+                    self.toast = Some(("Общий доступ для этих элементов недоступен".into(), now(ctx)));
                 }
             }
             Cmd::Properties => {
@@ -1457,7 +1460,7 @@ impl OxideApp {
         self.mark_settings(ctx);
     }
 
-    /// Полное системное меню («Показать дополнительные параметры»).
+    /// Полное системное меню («Показать дополнительные параметры»)
     pub fn show_system_menu(&mut self, ctx: &egui::Context, pos: Pos2, extended: bool) {
         let ppp = ctx.pixels_per_point();
         let screen = window::client_to_screen(pos, ppp);
@@ -1569,7 +1572,7 @@ impl OxideApp {
         v
     }
 
-    /// Контекстное меню элементов (как в Windows 11).
+    /// Контекстное меню элементов (как в Windows 11)
     pub fn item_menu(&mut self, ctx: &egui::Context, pos: Pos2) -> Popup {
         let t = self.tab();
         let ents: Vec<Entry> = t.selected_entries().into_iter().cloned().collect();
@@ -1630,7 +1633,7 @@ impl OxideApp {
         Popup::new(id, pos, items, now(ctx)).with_top(top)
     }
 
-    /// Контекстное меню пустого места папки.
+    /// Контекстное меню пустого места папки
     pub fn background_menu(&mut self, ctx: &egui::Context, pos: Pos2) -> Popup {
         let virt = self.tab().is_virtual();
         let has_dir = self.tab().fs_dir().is_some() && !virt;
@@ -1708,11 +1711,11 @@ impl OxideApp {
     fn handle_drops(&mut self, ctx: &egui::Context) {
         let t_now = now(ctx);
         let ppp = ctx.pixels_per_point();
-        // Наши файлы перетаскиваются наружу/внутрь (OLE). Выполняется в конце кадра.
+        // Наши файлы перетаскиваются наружу/внутрь (OLE). Выполняется в конце кадра
         if let Some(paths) = self.pending_drag.take() {
             let _ = smenu::drag_out(&paths);
             self.ignore_drops_until = t_now + 1.5;
-            // Если отпустили над нашим окном — выполняем сами.
+            // Если отпустили над нашим окном - выполняем сами
             if let Some(p) = window::cursor_client_points(ppp) {
                 if ctx.screen_rect().contains(p) && self.over_own_window() {
                     if let Some(target) = self.drop_target_at(p) {
@@ -1802,7 +1805,7 @@ impl eframe::App for OxideApp {
         self.poll(ctx);
         self.drop_targets = DropTargets::default();
 
-        // Отложенный поиск при наборе.
+        // Отложенный поиск при наборе
         let t_now = now(ctx);
         let a = self.active;
         if let Some(at) = self.tabs[a].search_edit_at {
@@ -1817,9 +1820,9 @@ impl eframe::App for OxideApp {
         ui::keys::handle(self, ctx);
         ui::frame(self, ctx);
 
-        // Меню поверх всего.
+        // Меню поверх всего
         if let Some(mut pop) = self.popup.take() {
-            // Слой-заглушка: щелчок мимо меню не срабатывает на элементах под ним.
+            // Слой-заглушка: щелчок мимо меню не срабатывает на элементах под ним
             egui::Area::new(egui::Id::new("popup-blocker"))
                 .order(egui::Order::Middle)
                 .fixed_pos(Pos2::ZERO)
@@ -1839,10 +1842,10 @@ impl eframe::App for OxideApp {
 
         self.handle_drops(ctx);
 
-        // Заголовок окна = имя текущей папки (как в Проводнике).
+        // Заголовок окна = имя текущей папки (как в Проводнике)
         let title = if self.tab().searching() { format!("Результаты поиска в «{}»", self.tab().title) } else { self.tab().title.clone() };
         if title != self.last_title {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Title(format!("{title} — Oxide")));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Title(format!("{title} - Oxide")));
             self.last_title = title;
         }
         if let Some(t) = self.settings_dirty {

@@ -1,4 +1,4 @@
-//! Буфер обмена в формате Проводника: CF_HDROP + «Preferred DropEffect» (копировать/вырезать).
+//! Буфер обмена в формате Проводника: CF_HDROP + «Preferred DropEffect» (копировать/вырезать)
 
 use std::path::PathBuf;
 
@@ -69,7 +69,7 @@ pub fn set_files(paths: &[PathBuf], cut: bool) -> bool {
     }
 }
 
-/// Файлы из буфера: (пути, вырезаны ли).
+/// Файлы из буфера: (пути, вырезаны ли)
 pub fn get_files() -> Option<(Vec<PathBuf>, bool)> {
     unsafe {
         if IsClipboardFormatAvailable(CF_HDROP.0 as u32).is_err() {

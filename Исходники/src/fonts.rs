@@ -1,4 +1,4 @@
-//! Системные шрифты Windows 11: Segoe UI Variable, Segoe UI Semibold, Segoe Fluent Icons.
+//! Системные шрифты Windows 11: Segoe UI Variable, Segoe UI Semibold, Segoe Fluent Icons
 
 use std::sync::Arc;
 
@@ -38,7 +38,7 @@ pub fn install(ctx: &egui::Context) {
     let mut sb = semibold;
     sb.extend(p.iter().cloned());
     defs.families.insert(FontFamily::Name("semibold".into()), sb);
-    // Моноширинный (область просмотра текста): Cascadia Mono / Consolas из Windows.
+    // Моноширинный (область просмотра текста): Cascadia Mono / Consolas из Windows
     let mut mono: Vec<String> = vec![];
     for (key, file) in [("cascadia", "CascadiaMono.ttf"), ("consolas", "consola.ttf")] {
         if let Some(b) = read(file) {

@@ -1,5 +1,5 @@
 //! Файловые операции через IFileOperation (родные диалоги прогресса, конфликтов, UAC, Корзина)
-//! в отдельном STA-потоке, чтобы окно не зависало.
+//! в отдельном STA-потоке, чтобы окно не зависало
 
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -125,7 +125,7 @@ unsafe fn perform(op: &Op) -> Result<bool, String> {
     match fo.PerformOperations() {
         Ok(()) => {}
         Err(e) => {
-            // ERROR_CANCELLED / COPYENGINE_E_USER_CANCELLED — пользователь отменил.
+            // ERROR_CANCELLED / COPYENGINE_E_USER_CANCELLED - пользователь отменил
             let code = e.code().0 as u32;
             if code == 0x800704C7 || code == 0x80270000 {
                 return Ok(true);
@@ -137,14 +137,14 @@ unsafe fn perform(op: &Op) -> Result<bool, String> {
     Ok(aborted)
 }
 
-/// Создание папки (синхронно — мгновенная операция).
+/// Создание папки (синхронно - мгновенная операция)
 pub fn create_folder(dir: &Path) -> Result<PathBuf, String> {
     let p = super::fs::unique_name(dir, "Новая папка", "");
     std::fs::create_dir(super::fs::long_path(&p)).map_err(|e| e.to_string())?;
     Ok(p)
 }
 
-/// Позиция в списке «Создать» из реестра ShellNew.
+/// Позиция в списке «Создать» из реестра ShellNew
 #[derive(Clone, Debug)]
 pub struct NewItem {
     pub ext: String,
@@ -159,7 +159,7 @@ pub enum NewKind {
     Data(Vec<u8>),
 }
 
-/// Читает список шаблонов «Создать» так же, как Проводник.
+/// Читает список шаблонов «Создать» так же, как Проводник
 pub fn shellnew_items() -> Vec<NewItem> {
     use crate::util::{reg_read_binary, reg_read_multi, reg_read_string};
     use windows::Win32::System::Registry::{HKEY_CLASSES_ROOT, HKEY_CURRENT_USER};
@@ -245,7 +245,7 @@ pub fn create_text_file(dir: &Path) -> Result<PathBuf, String> {
     Ok(p)
 }
 
-/// Сжатие в ZIP (фоново).
+/// Сжатие в ZIP (фоново)
 pub fn compress_zip(items: &[PathBuf], out: &Path) -> Result<(), String> {
     use std::io::Write;
     let f = std::fs::File::create(out).map_err(|e| e.to_string())?;

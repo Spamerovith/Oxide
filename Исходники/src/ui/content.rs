@@ -1,5 +1,5 @@
-//! Область содержимого: таблица, значки (огромные…мелкие), список, плитка, содержимое.
-//! Виртуализация: рисуются только видимые элементы, поэтому папки на 100 000 файлов не тормозят.
+//! Область содержимого: таблица, значки (огромные…мелкие), список, плитка, содержимое
+//! Виртуализация: рисуются только видимые элементы, поэтому папки на 100 000 файлов не тормозят
 
 use egui::text::{LayoutJob, TextFormat, TextWrapping};
 use egui::emath::GuiRounding;
@@ -123,7 +123,7 @@ pub fn layout(view: ViewMode, n: usize, avail: Vec2, compact: bool, cols_w: f32)
     Lay { flow, cell, cols, rows, pad, total }
 }
 
-/// Ключ и путь системного значка для элемента.
+/// Ключ и путь системного значка для элемента
 pub fn icon_req(e: &Entry, thumbs: bool) -> (String, String, bool) {
     let path = e.shell.clone().unwrap_or_else(|| e.path.to_string_lossy().to_string());
     if e.shell.is_some() {
@@ -155,11 +155,11 @@ fn paint_icon(app: &mut OxideApp, ui: &Ui, e: &Entry, center: Pos2, size: f32, t
         let r = Rect::from_center_size(center, s * k).round_to_pixels(ppp);
         ui.painter().image(tex.id(), r, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), tint);
         if thumb && !e.is_dir && size >= 48.0 && s.x.max(s.y) * k > size * 0.6 {
-            // Тонкая рамка вокруг эскизов изображений, как в Проводнике.
+            // Тонкая рамка вокруг эскизов изображений, как в Проводнике
             ui.painter().rect_stroke(r, CornerRadius::ZERO, Stroke::new(1.0, Color32::from_black_alpha(30)), StrokeKind::Outside);
         }
     } else {
-        // Пока значок грузится — лёгкий значок-заглушка того же размера (без «прыжка» раскладки).
+        // Пока значок грузится - лёгкий значок-заглушка того же размера (без «прыжка» раскладки)
         let g = if e.is_dir { ICON_FOLDER } else { ICON_DOC };
         glyph(ui.painter(), center, g, (size * 0.8).min(48.0), app.pal.text3.gamma_multiply(0.6));
     }
@@ -190,7 +190,7 @@ fn header(app: &mut OxideApp, ui: &mut Ui, r: Rect) {
         if resp.clicked() {
             sort_click = Some(c.id);
         }
-        // Граница столбца — перетаскивание меняет ширину.
+        // Граница столбца - перетаскивание меняет ширину
         let edge = Rect::from_center_size(Pos2::new(cr.right(), cr.center().y), Vec2::new(8.0, r.height()));
         let er = ui.interact(edge, Id::new(("hdr-edge", c.slot)), Sense::drag());
         if er.hovered() || er.dragged() {
@@ -235,7 +235,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
 
     let t = app.tab();
     let t_now = now(&ctx);
-    // Состояния: загрузка, ошибка, пусто.
+    // Состояния: загрузка, ошибка, пусто
     if t.entries.is_empty() {
         if let Some(err) = t.error.clone() {
             let c = Pos2::new(area.center().x, area.top() + 80.0);
@@ -255,7 +255,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
             return;
         }
-        let msg = if t.searching() { "Нет элементов, удовлетворяющих условиям поиска." } else { "Эта папка пуста." };
+        let msg = if t.searching() { "Нет элементов, удовлетворяющих условиям поиска" } else { "Эта папка пуста" };
         ui.painter().text(Pos2::new(area.center().x, area.top() + 28.0), Align2::CENTER_CENTER, msg, font(12.0), pal.text2);
         let bg = ui.interact(area, Id::new(("empty-bg", t.id)), Sense::click());
         if bg.secondary_clicked() {
@@ -313,7 +313,7 @@ fn body(app: &mut OxideApp, ui: &mut Ui, lay: Lay, view: ViewMode) {
     let clip = ui.clip_rect();
     let total = Rect::from_min_size(origin, lay.total);
     ui.allocate_rect(total, Sense::hover());
-    // Фон ловит щелчки по всей видимой области, а не только под элементами.
+    // Фон ловит щелчки по всей видимой области, а не только под элементами
     let bg = ui.interact(total.union(clip), Id::new(("items-bg", app.tabs[app.active].id)), Sense::click_and_drag());
     let n = app.tabs[a].order.len();
     let local_clip = clip.translate(-origin.to_vec2());
@@ -328,7 +328,7 @@ fn body(app: &mut OxideApp, ui: &mut Ui, lay: Lay, view: ViewMode) {
     let primary_pressed = ctx.input(|i| i.pointer.primary_pressed());
     let secondary_pressed = ctx.input(|i| i.pointer.secondary_pressed());
 
-    // Сообщаем размеры раскладки для навигации клавишами.
+    // Сообщаем размеры раскладки для навигации клавишами
     {
         let t = &mut app.tabs[a];
         t.grid_cols = match lay.flow {
@@ -376,7 +376,7 @@ fn body(app: &mut OxideApp, ui: &mut Ui, lay: Lay, view: ViewMode) {
         if hovered {
             item_hovered = true;
         }
-        // Фон.
+        // Фон
         let p = ui.painter();
         let hl = match view {
             ViewMode::Details | ViewMode::Content | ViewMode::Small | ViewMode::List => Rect::from_min_max(Pos2::new(hit.left(), r.top() + 2.0), Pos2::new(hit.right(), r.bottom() - 2.0)),
@@ -398,13 +398,13 @@ fn body(app: &mut OxideApp, ui: &mut Ui, lay: Lay, view: ViewMode) {
         let mut check_rect: Option<Rect> = None;
         let name_rect = paint_item(app, ui, &e, r, hl, view, &cols, thumbs, isz, dim, checkboxes && (hovered || selected), selected, &mut check_rect, rename_idx == Some(ei));
 
-        // Переименование на месте.
+        // Переименование на месте
         if rename_idx == Some(ei) {
             rename_editor(app, ui, name_rect, view);
         }
 
-        // Выделение мышью (по нажатию, как в Проводнике).
-        // В таблице «тело» элемента — значок и имя; с остальной части строки тянется рамка, как в Проводнике.
+        // Выделение мышью (по нажатию, как в Проводнике)
+        // В таблице «тело» элемента - значок и имя; с остальной части строки тянется рамка, как в Проводнике
         let ptr = ctx.input(|i| i.pointer.interact_pos()).unwrap_or_default();
         let on_body = view != ViewMode::Details || ptr.x < r.left() + cols.first().map(|c| c.w).unwrap_or(260.0);
         if hovered && primary_pressed && !on_body {
@@ -474,7 +474,7 @@ fn body(app: &mut OxideApp, ui: &mut Ui, lay: Lay, view: ViewMode) {
         }
     }
 
-    // Пустое место: снять выделение, рамка выделения, меню фона.
+    // Пустое место: снять выделение, рамка выделения, меню фона
     if bg.hovered() && !item_hovered && primary_pressed {
         if app.tabs[a].rename.is_some() {
             app.commit_rename(&ctx);
@@ -496,7 +496,7 @@ fn body(app: &mut OxideApp, ui: &mut Ui, lay: Lay, view: ViewMode) {
         if ctx.input(|i| i.pointer.primary_down()) {
             if let Some(p) = ctx.input(|i| i.pointer.latest_pos()) {
                 mq.cur = p - origin.to_vec2();
-                // Прокрутка у краёв.
+                // Прокрутка у краёв
                 let edge = 24.0;
                 let mut d = Vec2::ZERO;
                 if p.y < clip.top() + edge {

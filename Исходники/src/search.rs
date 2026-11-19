@@ -1,11 +1,11 @@
-//! Мгновенный поиск по всем локальным дискам.
+//! Мгновенный поиск по всем локальным дискам
 //!
 //! Индекс имён строится в фоне с низким приоритетом и пишется потоком прямо на диск
 //! (%LOCALAPPDATA%\Oxide\index). Для поиска файлы индекса отображаются в память (memory-mapped):
-//! страницы общие и сбрасываются системой, поэтому личная память процесса почти не растёт.
+//! страницы общие и сбрасываются системой, поэтому личная память процесса почти не растёт
 //! При следующем запуске готовый индекс подхватывается сразу. Изменения ловит наблюдатель
-//! ReadDirectoryChangesW. Служебные папки (Windows, $Recycle.Bin…) не индексируются —
-//! поиск в них идёт напрямую по диску.
+//! ReadDirectoryChangesW. Служебные папки (Windows, $Recycle.Bin…) не индексируются -
+//! поиск в них идёт напрямую по диску
 
 use std::collections::HashSet;
 use std::io::{BufWriter, Write};
@@ -29,7 +29,7 @@ const F_DIR: u8 = 1;
 const F_HIDDEN: u8 = 2;
 const FORMAT: u32 = 2;
 
-/// Файл, отображённый в память только для чтения.
+/// Файл, отображённый в память только для чтения
 struct Mapped {
     ptr: *const u8,
     len: usize,
@@ -96,9 +96,9 @@ pub struct Index {
     n: usize,
     dir: PathBuf,
     pub built: u64,
-    /// Добавленные после построения: (путь, папка?).
+    /// Добавленные после построения: (путь, папка?)
     added: Vec<(String, bool)>,
-    /// Удалённые после построения (нижний регистр).
+    /// Удалённые после построения (нижний регистр)
     removed: HashSet<String>,
 }
 
@@ -122,7 +122,7 @@ impl Index {
     }
     fn name_of(&self, r: &Rec) -> &str {
         let b = &self.names.bytes()[r.off as usize..r.off as usize + r.len as usize];
-        // Записываем только корректный UTF-8.
+        // Записываем только корректный UTF-8
         unsafe { std::str::from_utf8_unchecked(b) }
     }
     fn path(&self, mut i: u32) -> String {
@@ -151,7 +151,7 @@ impl Index {
     pub fn len(&self) -> usize {
         self.n + self.added.len()
     }
-    /// Размер файлов индекса на диске.
+    /// Размер файлов индекса на диске
     pub fn disk_bytes(&self) -> usize {
         self.names.len + self.recs.len
     }
@@ -162,7 +162,7 @@ fn index_root() -> Option<PathBuf> {
     Some(PathBuf::from(base).join("Oxide").join("index"))
 }
 
-/// Папки верхнего уровня диска, которые не индексируются (поиск в них идёт напрямую).
+/// Папки верхнего уровня диска, которые не индексируются (поиск в них идёт напрямую)
 fn excluded_top(name: &str, system_drive: bool) -> bool {
     let l = name.to_ascii_lowercase();
     matches!(l.as_str(), "$recycle.bin" | "system volume information" | "$winreagent" | "config.msi" | "$windows.~bt" | "$windows.~ws" | "$sysreset" | "recovery")
@@ -189,7 +189,7 @@ impl SearchEngine {
         self.index.read().map(|g| g.is_some()).unwrap_or(false)
     }
 
-    /// Загружает готовый индекс с диска (мгновенно) и при необходимости обновляет его в фоне.
+    /// Загружает готовый индекс с диска (мгновенно) и при необходимости обновляет его в фоне
     pub fn start(self: &Arc<Self>, ctx: egui::Context) {
         let me = self.clone();
         std::thread::Builder::new()
@@ -205,7 +205,7 @@ impl SearchEngine {
                     ctx.request_repaint();
                 }
                 if !fresh {
-                    // Даём приложению спокойно запуститься.
+                    // Даём приложению спокойно запуститься
                     std::thread::sleep(std::time::Duration::from_secs(if me.ready() { 60 } else { 3 }));
                     me.build(ctx);
                 }
@@ -213,7 +213,7 @@ impl SearchEngine {
             .ok();
     }
 
-    /// Построение индекса в фоне (низкий приоритет, запись потоком на диск).
+    /// Построение индекса в фоне (низкий приоритет, запись потоком на диск)
     pub fn build(self: &Arc<Self>, ctx: egui::Context) {
         if self.building.swap(true, Ordering::SeqCst) {
             return;
@@ -300,7 +300,7 @@ impl SearchEngine {
         }
     }
 
-    /// Покрывает ли индекс эту папку (служебные папки не индексируются).
+    /// Покрывает ли индекс эту папку (служебные папки не индексируются)
     pub fn covers(&self, root: &Path) -> bool {
         let s = root.to_string_lossy();
         let mut comps = s.trim_end_matches('\\').split('\\');
@@ -315,7 +315,7 @@ impl SearchEngine {
         }
     }
 
-    /// Поиск в индексе: все слова (или маска с * ?) в имени, только внутри `root`.
+    /// Поиск в индексе: все слова (или маска с * ?) в имени, только внутри `root`
     pub fn query(&self, root: &Path, q: &Query, show_hidden: bool, limit: usize) -> Option<Vec<(String, bool)>> {
         if !self.covers(root) {
             return None;
@@ -410,7 +410,7 @@ fn open_index(dir: &Path) -> Option<Index> {
     Some(Index { names, recs, n, dir: dir.to_path_buf(), built, added: vec![], removed: HashSet::new() })
 }
 
-/// Самый свежий готовый индекс; старые и недостроенные удаляются.
+/// Самый свежий готовый индекс; старые и недостроенные удаляются
 fn load_latest() -> Option<Index> {
     let root = index_root()?;
     let mut dirs: Vec<PathBuf> = std::fs::read_dir(&root).ok()?.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
@@ -469,7 +469,7 @@ fn flags_of(attrs: u32) -> u8 {
     f
 }
 
-/// Параллельный обход дисков с записью индекса прямо в файлы.
+/// Параллельный обход дисков с записью индекса прямо в файлы
 fn build_to_disk(drives: &[PathBuf], progress: &AtomicUsize) -> Option<PathBuf> {
     let root = index_root()?;
     let dir = root.join(format!("{:020}", crate::util::now_filetime()));
@@ -491,7 +491,7 @@ fn build_to_disk(drives: &[PathBuf], progress: &AtomicUsize) -> Option<PathBuf> 
         }
     }
     let active = AtomicUsize::new(0);
-    // Не более 4 потоков, чтобы система оставалась отзывчивой.
+    // Не более 4 потоков, чтобы система оставалась отзывчивой
     let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(2, 4);
     std::thread::scope(|s| {
         for _ in 0..threads {
@@ -554,7 +554,7 @@ fn build_to_disk(drives: &[PathBuf], progress: &AtomicUsize) -> Option<PathBuf> 
     Some(dir)
 }
 
-/// Разобранный поисковый запрос.
+/// Разобранный поисковый запрос
 #[derive(Clone, Debug)]
 pub struct Query {
     terms: Vec<String>,
@@ -607,7 +607,7 @@ fn glob_match(p: &[char], s: &[char]) -> bool {
     pi == p.len()
 }
 
-/// Живой рекурсивный поиск (если папка не в индексе): отдаёт пачки результатов.
+/// Живой рекурсивный поиск (если папка не в индексе): отдаёт пачки результатов
 pub fn live_search(root: PathBuf, q: Query, show_hidden: bool, cancel: Arc<AtomicBool>, mut emit: impl FnMut(Vec<(String, bool)>) + Send) {
     let stack = Mutex::new(vec![root]);
     let results = Mutex::new(Vec::<(String, bool)>::new());

@@ -1,4 +1,4 @@
-//! Кнопки навигации, адресная строка с «хлебными крошками» и поле поиска.
+//! Кнопки навигации, адресная строка с «хлебными крошками» и поле поиска
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -108,7 +108,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let cy = rect.center().y;
     let a = app.active;
 
-    // Назад / Вперёд / Вверх / Обновить.
+    // Назад / Вперёд / Вверх / Обновить
     let mut x = rect.left() + 14.0;
     let btn = |x: f32| Rect::from_min_size(Pos2::new(x, cy - m::BTN_H / 2.0), Vec2::new(m::NAV_BTN_W, m::BTN_H));
     let can_back = !app.tabs[a].back.is_empty() || app.tabs[a].searching();
@@ -144,7 +144,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     }
     x += m::NAV_BTN_W + 12.0;
 
-    // Поле поиска справа.
+    // Поле поиска справа
     let sw = app.settings.search_width;
     let search_r = Rect::from_min_size(Pos2::new(rect.right() - 16.0 - sw, cy - m::FIELD_H / 2.0), Vec2::new(sw, m::FIELD_H));
     let addr_r = Rect::from_min_max(Pos2::new(x, cy - m::FIELD_H / 2.0), Pos2::new(search_r.left() - 8.0, cy + m::FIELD_H / 2.0));
@@ -225,7 +225,7 @@ fn address(app: &mut OxideApp, ui: &mut Ui, r: Rect) {
         return;
     }
 
-    // Режим «хлебных крошек».
+    // Режим «хлебных крошек»
     let cy = r.center().y;
     let loc = app.tabs[a].loc.clone();
     super::titlebar::paint_loc_icon(app, ui, &loc, Pos2::new(r.left() + 20.0, cy));
@@ -259,7 +259,7 @@ fn address(app: &mut OxideApp, ui: &mut Ui, r: Rect) {
     }
     let last_i = cr.len().saturating_sub(1);
     for (i, (label, l)) in cr.iter().enumerate().skip(first) {
-        // Шеврон перед элементом — список подпапок родителя.
+        // Шеврон перед элементом - список подпапок родителя
         let chev = Rect::from_min_size(Pos2::new(x, cy - 12.0), Vec2::new(20.0, 24.0));
         let resp = ui.interact(chev, Id::new(("crumb-chev", i)), Sense::click());
         subtle_bg(ui, &resp, chev, &pal, m::R_CTRL, false);
@@ -285,7 +285,7 @@ fn address(app: &mut OxideApp, ui: &mut Ui, r: Rect) {
             break;
         }
     }
-    // Последний шеврон — подпапки текущей папки.
+    // Последний шеврон - подпапки текущей папки
     if x + 24.0 < r.right() - 4.0 && app.tabs[a].loc.is_listing() && !app.tabs[a].searching() {
         let chev = Rect::from_min_size(Pos2::new(x, cy - 12.0), Vec2::new(20.0, 24.0));
         let resp = ui.interact(chev, Id::new("crumb-chev-last"), Sense::click());
@@ -344,7 +344,7 @@ fn loc_cmd(l: &Location) -> Cmd {
     }
 }
 
-/// Переход по введённому адресу (путь, shell:, переменные окружения, программа).
+/// Переход по введённому адресу (путь, shell:, переменные окружения, программа)
 fn go_address(app: &mut OxideApp, ctx: &egui::Context, text: &str) {
     if text.is_empty() {
         return;
@@ -369,7 +369,7 @@ fn go_address(app: &mut OxideApp, ctx: &egui::Context, text: &str) {
         return;
     }
     if low.starts_with("shell:") || low.starts_with("::") {
-        // shell:downloads и т.п. — пробуем получить путь файловой системы.
+        // shell:downloads и т.п. - пробуем получить путь файловой системы
         if let Some(fsp) = shell_fs_path(&expanded) {
             app.navigate(ctx, Location::Path(fsp));
         } else {
@@ -384,11 +384,11 @@ fn go_address(app: &mut OxideApp, ctx: &egui::Context, text: &str) {
             return;
         }
     }
-    // Как в Проводнике: команда (cmd, notepad, https://...) запускается.
+    // Как в Проводнике: команда (cmd, notepad, https://...) запускается
     if !crate::shell::menu::shell_execute(&expanded, None, None) {
         app.dialog = Some(crate::app::Dialog::Message {
             title: "Проводник Oxide".into(),
-            text: format!("Не удаётся найти «{text}». Проверьте правильность написания и повторите попытку."),
+            text: format!("Не удаётся найти «{text}». Проверьте правильность написания и повторите попытку"),
         });
     }
 }
@@ -493,7 +493,7 @@ fn search(app: &mut OxideApp, ui: &mut Ui, r: Rect) {
     }
     let running = app.tabs[a].search.as_ref().map(|s| s.running).unwrap_or(false);
     if running {
-        // Вращающийся индикатор вместо лупы, пока идёт поиск.
+        // Вращающийся индикатор вместо лупы, пока идёт поиск
         let t = ctx.input(|i| i.time) as f32;
         let c = icon_r.center();
         let start = t * 6.0;

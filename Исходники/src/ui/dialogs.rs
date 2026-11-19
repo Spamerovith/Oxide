@@ -1,4 +1,4 @@
-//! Диалоги: «Параметры» (с выбором интерфейса), сообщения, «О программе».
+//! Диалоги: «Параметры» (с выбором интерфейса), сообщения, «О программе»
 
 use egui::{Align2, CornerRadius, Id, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 
@@ -7,11 +7,13 @@ use crate::app::{Dialog, OxideApp};
 use crate::settings::OpenTo;
 use crate::theme::{m, Palette, ThemeChoice};
 
-pub const DISCLAIMER: &str = "Oxide — независимый проект с открытым исходным кодом. Он не связан с Microsoft, не одобрен и не поддерживается ею. Windows и Windows 11 — товарные знаки Microsoft Corporation. Сторонние библиотеки и их лицензии перечислены в файле THIRD_PARTY_LICENSES.md.";
+pub const DISCLAIMER: &str = "Oxide - независимый проект с открытым исходным кодом. Он не связан с Microsoft, не одобрен и не поддерживается ею. Windows и Windows 11 - товарные знаки Microsoft Corporation. Сторонние библиотеки и их лицензии перечислены в файле THIRD_PARTY_LICENSES.md";
 
 pub fn show(app: &mut OxideApp, ctx: &egui::Context) {
     let Some(d) = app.dialog.take() else { return };
     let pal = app.pal.clone();
+    let ctx = ctx.clone();
+    let ctx = &ctx;
     crate::theme::set_surface(pal.flyout);
     let frame = egui::Frame::new()
         .fill(pal.flyout)
@@ -41,14 +43,21 @@ pub fn show(app: &mut OxideApp, ctx: &egui::Context) {
             ui.add_space(4.0);
             ui.label(egui::RichText::new(format!("Версия {}", env!("CARGO_PKG_VERSION"))).font(font(14.0)).color(pal.text2));
             ui.add_space(12.0);
-            ui.add(egui::Label::new(egui::RichText::new("Быстрый проводник для Windows на Rust. Интерфейс повторяет Проводник Windows 11, а файловые операции выполняет сам движок Windows.").font(font(14.0)).color(pal.text)).wrap());
+            ui.add(egui::Label::new(egui::RichText::new("Быстрый проводник для Windows на Rust. Интерфейс повторяет Проводник Windows 11, а файловые операции выполняет сам движок Windows").font(font(14.0)).color(pal.text)).wrap());
             ui.add_space(12.0);
             ui.add(egui::Label::new(egui::RichText::new(DISCLAIMER).font(font(12.0)).color(pal.text2)).wrap());
             ui.add_space(24.0);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if button(ui, "Закрыть", true, &pal, 120.0).clicked() {
-                    keep = false;
+            ui.horizontal(|ui| {
+                let mut dont = !app.settings.show_about_on_start;
+                if checkbox(ui, &mut dont, "Больше не показывать", &pal).changed() {
+                    app.settings.show_about_on_start = !dont;
+                    app.mark_settings(&ctx);
                 }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if button(ui, "Закрыть", true, &pal, 120.0).clicked() {
+                        keep = false;
+                    }
+                });
             });
         }
     });
@@ -147,15 +156,15 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
             let info = app.engine.index.read().ok().and_then(|g| g.as_ref().map(|ix| (ix.len(), ix.disk_bytes(), ix.built)));
             let mut t = match info {
                 Some((n, bytes, built)) => format!(
-                    "В индексе {} объектов (на диске {}, обновлён {}). Индекс читается с диска по мере надобности и почти не занимает оперативную память.",
+                    "В индексе {} объектов (на диске {}, обновлён {}). Индекс читается с диска по мере надобности и почти не занимает оперативную память",
                     n,
                     crate::util::format_bytes(bytes as u64),
                     crate::util::format_filetime(built)
                 ),
-                None => "Индекс ещё не построен: поиск идёт по папкам напрямую.".into(),
+                None => "Индекс ещё не построен: поиск идёт по папкам напрямую".into(),
             };
             if building {
-                t.push_str(&format!(" Обновление… обработано объектов: {prog}."));
+                t.push_str(&format!(" Обновление… обработано объектов: {prog}"));
             }
             t
         };
@@ -190,7 +199,7 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
     });
 }
 
-/// Миниатюра окна в выбранной теме.
+/// Миниатюра окна в выбранной теме
 fn mini_window(ui: &Ui, r: Rect, p: &Palette) {
     let pt = ui.painter();
     pt.rect_filled(r, CornerRadius::same(m::R_OVERLAY), p.base);

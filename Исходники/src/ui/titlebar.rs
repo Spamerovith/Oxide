@@ -1,4 +1,4 @@
-//! Полоса вкладок в заголовке окна и кнопки «Свернуть / Развернуть / Закрыть».
+//! Полоса вкладок в заголовке окна и кнопки «Свернуть / Развернуть / Закрыть»
 
 use std::sync::atomic::Ordering;
 
@@ -30,7 +30,7 @@ pub fn location_glyph(loc: &Location) -> char {
     }
 }
 
-/// Значок расположения 16×16 (системный, если есть).
+/// Значок расположения 16×16 (системный, если есть)
 pub fn paint_loc_icon(app: &mut OxideApp, ui: &Ui, loc: &Location, center: Pos2) {
     let ppp = ui.ctx().pixels_per_point();
     let px = (16.0 * ppp).round() as u32;
@@ -53,7 +53,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let pal = app.pal.clone();
     let ctx = ui.ctx().clone();
 
-    // Кнопки окна.
+    // Кнопки окна
     let close_r = Rect::from_min_size(Pos2::new(rect.right() - m::CAPTION_W, rect.top()), Vec2::new(m::CAPTION_W, m::CAPTION_H));
     let max_r = close_r.translate(Vec2::new(-m::CAPTION_W, 0.0));
     let min_r = max_r.translate(Vec2::new(-m::CAPTION_W, 0.0));
@@ -69,7 +69,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     }
     interactive.push(phys(min_r));
 
-    // Кнопка «Развернуть» — системная зона HTMAXBUTTON, чтобы работали Snap Layouts.
+    // Кнопка «Развернуть» - системная зона HTMAXBUTTON, чтобы работали Snap Layouts
     let max_hover = window::MAX_HOVER.load(Ordering::Relaxed);
     let max_pressed = window::MAX_PRESSED.load(Ordering::Relaxed);
     let max_resp = ui.interact(max_r, Id::new("cap-max"), Sense::click());
@@ -96,7 +96,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     }
     interactive.push(phys(close_r));
 
-    // Вкладки.
+    // Вкладки
     let left = rect.left() + 8.0;
     let right_limit = min_r.left() - 48.0;
     let n = app.tabs.len().max(1) as f32;
@@ -124,7 +124,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
         interactive.push(phys(r));
         let p = ui.painter();
         if is_active {
-            // Активная вкладка сливается со строкой адреса; «ушки» внизу.
+            // Активная вкладка сливается со строкой адреса; «ушки» внизу
             let body = Rect::from_min_max(r.min, Pos2::new(r.right(), rect.bottom()));
             p.rect_filled(body, CornerRadius { nw: 8, ne: 8, sw: 0, se: 0 }, pal.layer);
             let ear = 8.0;
@@ -140,7 +140,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
                 let hr = Rect::from_min_max(Pos2::new(r.left() + 2.0, r.top() + 2.0), Pos2::new(r.right() - 2.0, r.bottom() - 4.0));
                 p.rect_filled(hr, CornerRadius::same(m::R_CTRL), pal.fill(pal.hover.gamma_multiply(t)));
             }
-            // Разделитель между неактивными вкладками.
+            // Разделитель между неактивными вкладками
             let next_active = i + 1 == active;
             let near_hover = hover_idx == Some(i) || hover_idx == Some(i + 1);
             if i + 1 < ntabs && !next_active && !near_hover {
@@ -180,7 +180,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
                 let dx = resp.drag_delta().x;
                 let cur = app.tab_drag.map(|d| d.1).unwrap_or(0.0) + dx;
                 app.tab_drag = Some((i, cur));
-                // Перестановка с соседями.
+                // Перестановка с соседями
                 if cur > tab_w / 2.0 && i + 1 < ntabs {
                     app.tabs.swap(i, i + 1);
                     if app.active == i {
@@ -200,7 +200,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
                 }
             }
             if resp.drag_stopped() {
-                // Вытащили вкладку вниз за пределы полосы — в новое окно.
+                // Вытащили вкладку вниз за пределы полосы - в новое окно
                 if let Some(p) = resp.interact_pointer_pos() {
                     if p.y > rect.bottom() + 60.0 && ntabs > 1 {
                         action = Some(Cmd::TabToWindow(app.tab_drag.map(|d| d.0).unwrap_or(i)));
@@ -214,7 +214,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
         }
     }
 
-    // «+» — новая вкладка.
+    // «+» - новая вкладка
     let plus = Rect::from_center_size(Pos2::new(x + 24.0, top + m::TAB_H / 2.0 - 2.0), Vec2::new(32.0, 32.0));
     let presp = icon_button(ui, plus, Id::new("newtab"), ICON_ADD, 12.0, &pal, true, "Новая вкладка (Ctrl+T)");
     interactive.push(phys(plus));

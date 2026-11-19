@@ -1,5 +1,5 @@
 //! Системные действия оболочки: полное контекстное меню Windows, глаголы (свойства, закрепить...),
-//! открытие файлов, «Открыть с помощью», перетаскивание наружу.
+//! открытие файлов, «Открыть с помощью», перетаскивание наружу
 
 use std::path::{Path, PathBuf};
 
@@ -62,7 +62,7 @@ unsafe fn background_menu(folder: &str, hwnd: HWND) -> Option<IContextMenu> {
     sf.CreateViewObject::<_, IContextMenu>(hwnd).ok()
 }
 
-/// Что выбрал пользователь в системном меню, если это нужно обработать нам.
+/// Что выбрал пользователь в системном меню, если это нужно обработать нам
 pub enum MenuOutcome {
     None,
     Rename,
@@ -70,8 +70,8 @@ pub enum MenuOutcome {
     Invoked(String),
 }
 
-/// Показывает полное системное контекстное меню («Показать дополнительные параметры»).
-/// `names` — пути или строки разбора; пустой список + `folder` — меню фона папки.
+/// Показывает полное системное контекстное меню («Показать дополнительные параметры»)
+/// `names` - пути или строки разбора; пустой список + `folder` - меню фона папки
 pub fn show_shell_menu(names: &[String], folder: Option<&str>, screen: (i32, i32), extended: bool) -> MenuOutcome {
     unsafe {
         let hwnd = super::window::hwnd();
@@ -134,7 +134,7 @@ unsafe fn invoke_id(cm: &IContextMenu, id: usize, folder: Option<&str>, screen: 
     let _ = cm.InvokeCommand(&info as *const _ as *const CMINVOKECOMMANDINFO);
 }
 
-/// Вызов глагола оболочки по имени («properties», «pintohome», «Windows.ModernShare»...).
+/// Вызов глагола оболочки по имени («properties», «pintohome», «Windows.ModernShare»...)
 pub fn invoke_verb(names: &[String], verb: &str) -> bool {
     unsafe {
         let Some(cm) = items_menu(names) else { return false };
@@ -157,7 +157,7 @@ pub fn invoke_verb(names: &[String], verb: &str) -> bool {
     }
 }
 
-/// Есть ли у элементов глагол (например, «pintohome» или «unpinfromhome»).
+/// Есть ли у элементов глагол (например, «pintohome» или «unpinfromhome»)
 pub fn has_verb(names: &[String], verb: &str) -> bool {
     unsafe {
         let Some(cm) = items_menu(names) else { return false };
@@ -183,7 +183,7 @@ pub fn has_verb(names: &[String], verb: &str) -> bool {
     }
 }
 
-/// Открыть файл программой по умолчанию.
+/// Открыть файл программой по умолчанию
 pub fn open(path: &str) -> bool {
     shell_execute(path, None, None)
 }
@@ -229,7 +229,7 @@ pub fn properties(names: &[String]) {
     }
 }
 
-/// «Открыть в Терминале»: Windows Terminal, иначе PowerShell.
+/// «Открыть в Терминале»: Windows Terminal, иначе PowerShell
 pub fn open_terminal(dir: &Path) {
     let d = dir.to_string_lossy().to_string();
     let ok = std::process::Command::new("wt.exe").arg("-d").arg(&d).spawn().is_ok();
@@ -238,7 +238,7 @@ pub fn open_terminal(dir: &Path) {
     }
 }
 
-/// Перетаскивание файлов в другие программы (и в другие окна). Возвращает эффект.
+/// Перетаскивание файлов в другие программы (и в другие окна). Возвращает эффект
 pub fn drag_out(paths: &[PathBuf]) -> Option<DROPEFFECT> {
     unsafe {
         let names: Vec<String> = paths.iter().map(|p| p.to_string_lossy().to_string()).collect();
@@ -246,7 +246,7 @@ pub fn drag_out(paths: &[PathBuf]) -> Option<DROPEFFECT> {
         if pidls.is_empty() {
             return None;
         }
-        // Общий родитель — относительные PIDL от него.
+        // Общий родитель - относительные PIDL от него
         let arr = item_array(&names)?;
         let data: IDataObject = arr.BindToHandler(None, &windows::Win32::UI::Shell::BHID_DataObject).ok().or_else(|| {
             let raw: Vec<*const ITEMIDLIST> = pidls.iter().map(|p| p.0 as *const _).collect();

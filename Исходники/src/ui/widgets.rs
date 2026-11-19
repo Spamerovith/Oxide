@@ -1,4 +1,4 @@
-//! Базовые элементы в стиле WinUI: шрифты, глифы, фоны наведения, переключатели.
+//! Базовые элементы в стиле WinUI: шрифты, глифы, фоны наведения, переключатели
 
 use egui::text::{LayoutJob, TextFormat, TextWrapping};
 use egui::emath::GuiRounding;
@@ -82,12 +82,12 @@ pub fn icon_font(size: f32) -> FontId {
 pub fn glyph(p: &Painter, center: Pos2, c: char, size: f32, color: Color32) {
     let galley = p.layout_no_wrap(c.to_string(), icon_font(size), color);
     let r = galley.rect;
-    // Глифы Fluent рисуются в квадрате em: центрируем по размеру шрифта, а не по строке.
+    // Глифы Fluent рисуются в квадрате em: центрируем по размеру шрифта, а не по строке
     let pos = Pos2::new(center.x - r.width() / 2.0, center.y - galley.size().y / 2.0);
     p.galley(pos.round(), galley, color);
 }
 
-/// Текст с обрезкой «…» по ширине; `pos` — левый край, середина по вертикали.
+/// Текст с обрезкой «…» по ширине; `pos` - левый край, середина по вертикали
 pub fn text_trunc(p: &Painter, pos: Pos2, text: &str, f: FontId, color: Color32, max_w: f32) -> f32 {
     if max_w <= 4.0 {
         return 0.0;
@@ -109,7 +109,7 @@ pub fn text_width(ui: &Ui, text: &str, f: FontId) -> f32 {
     ui.fonts(|fs| fs.layout_no_wrap(text.to_owned(), f, Color32::WHITE).size().x)
 }
 
-/// Фон кнопки без рамки: прозрачный → наведение → нажатие (с плавным появлением).
+/// Фон кнопки без рамки: прозрачный → наведение → нажатие (с плавным появлением)
 pub fn subtle_bg(ui: &Ui, resp: &Response, rect: Rect, pal: &Palette, r: u8, active: bool) {
     let t = ui.ctx().animate_bool_with_time(resp.id.with("hv"), resp.hovered() || active, m::T_HOVER);
     if resp.is_pointer_button_down_on() {
@@ -121,7 +121,7 @@ pub fn subtle_bg(ui: &Ui, resp: &Response, rect: Rect, pal: &Palette, r: u8, act
     }
 }
 
-/// Кнопка со значком.
+/// Кнопка со значком
 pub fn icon_button(ui: &mut Ui, rect: Rect, id: egui::Id, c: char, size: f32, pal: &Palette, enabled: bool, tip: &str) -> Response {
     let sense = if enabled { Sense::click() } else { Sense::hover() };
     let resp = ui.interact(rect, id, sense);
@@ -138,7 +138,7 @@ pub fn icon_button(ui: &mut Ui, rect: Rect, id: egui::Id, c: char, size: f32, pa
     }
 }
 
-/// Кнопка «значок + текст (+ шеврон)» командной панели. Возвращает ответ и ширину.
+/// Кнопка «значок + текст (+ шеврон)» командной панели. Возвращает ответ и ширину
 pub fn cmd_button(
     ui: &mut Ui,
     x: f32,
@@ -186,7 +186,7 @@ pub fn hline(p: &Painter, y: f32, x0: f32, x1: f32, color: Color32) {
     p.line_segment([Pos2::new(x0, y + 0.5), Pos2::new(x1, y + 0.5)], Stroke::new(1.0, color));
 }
 
-/// Переключатель WinUI (ToggleSwitch).
+/// Переключатель WinUI (ToggleSwitch)
 pub fn toggle(ui: &mut Ui, on: &mut bool, label: &str, pal: &Palette) -> Response {
     let h = 36.0;
     let w = ui.available_width();
@@ -213,7 +213,7 @@ pub fn toggle(ui: &mut Ui, on: &mut bool, label: &str, pal: &Palette) -> Respons
     resp
 }
 
-/// Флажок WinUI (CheckBox).
+/// Флажок WinUI (CheckBox)
 pub fn checkbox(ui: &mut Ui, on: &mut bool, label: &str, pal: &Palette) -> Response {
     let h = 32.0;
     let tw = text_width(ui, label, font(14.0));
@@ -236,7 +236,7 @@ pub fn checkbox(ui: &mut Ui, on: &mut bool, label: &str, pal: &Palette) -> Respo
     resp
 }
 
-/// Радиокнопка WinUI.
+/// Радиокнопка WinUI
 pub fn radio(ui: &mut Ui, on: bool, label: &str, pal: &Palette) -> Response {
     let h = 32.0;
     let tw = text_width(ui, label, font(14.0));
@@ -255,7 +255,7 @@ pub fn radio(ui: &mut Ui, on: bool, label: &str, pal: &Palette) -> Response {
     resp
 }
 
-/// Обычная кнопка WinUI (стандартная или акцентная).
+/// Обычная кнопка WinUI (стандартная или акцентная)
 pub fn button(ui: &mut Ui, label: &str, accent: bool, pal: &Palette, min_w: f32) -> Response {
     let tw = text_width(ui, label, font(14.0));
     let w = (tw + 24.0).max(min_w);
@@ -289,7 +289,7 @@ pub fn button(ui: &mut Ui, label: &str, accent: bool, pal: &Palette, min_w: f32)
     resp
 }
 
-/// Полоса заполнения диска (как в «Этот компьютер»).
+/// Полоса заполнения диска (как в «Этот компьютер»)
 pub fn usage_bar(p: &Painter, rect: Rect, frac: f32, pal: &Palette) {
     p.rect_filled(rect, CornerRadius::same(2), pal.bar_track);
     let full = frac >= 0.9;

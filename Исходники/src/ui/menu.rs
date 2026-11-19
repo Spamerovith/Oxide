@@ -1,5 +1,5 @@
 //! Всплывающие меню в стиле Windows 11: контекстное меню с верхней строкой значков,
-//! выпадающие списки командной панели, вложенные меню, управление с клавиатуры.
+//! выпадающие списки командной панели, вложенные меню, управление с клавиатуры
 
 use egui::{Align2, Color32, CornerRadius, Id, Key, Order, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Vec2};
 
@@ -11,7 +11,7 @@ use crate::theme::{m, Palette};
 pub enum MIcon {
     None,
     Glyph(char, Option<Color32>),
-    /// Системный значок: (ключ кэша, путь).
+    /// Системный значок: (ключ кэша, путь)
     Sys(String, String),
 }
 
@@ -153,7 +153,7 @@ fn measure(ctx: &egui::Context, items: &[MenuItem], min_w: f32) -> (f32, f32, bo
     (w.max(min_w).max(180.0).min(520.0), h, has_icon)
 }
 
-/// Рисует меню. Возвращает выбранную команду или закрытие.
+/// Рисует меню. Возвращает выбранную команду или закрытие
 pub fn show(ctx: &egui::Context, pop: &mut Popup, pal: &Palette, icons: &mut crate::shell::sysicons::IconCache, animations: bool) -> PopupResult {
     crate::theme::set_surface(pal.flyout);
     let now = ctx.input(|i| i.time);
@@ -187,7 +187,7 @@ pub fn show(ctx: &egui::Context, pop: &mut Popup, pal: &Palette, icons: &mut cra
     let mut result = PopupResult::Open;
     let mut rects = vec![rect];
 
-    // Клавиатура.
+    // Клавиатура
     let (up, down, enter, esc, right, left) = ctx.input(|i| {
         (
             i.key_pressed(Key::ArrowUp),
@@ -326,7 +326,7 @@ pub fn show(ctx: &egui::Context, pop: &mut Popup, pal: &Palette, icons: &mut cra
         }
     });
 
-    // Открытие вложенного меню при наведении (с небольшой задержкой, как в Windows).
+    // Открытие вложенного меню при наведении (с небольшой задержкой, как в Windows)
     if let Some((i, r)) = hovered_item {
         if !pop.items[i].sub.is_empty() {
             match pop.sub_hover_since {
@@ -352,7 +352,7 @@ pub fn show(ctx: &egui::Context, pop: &mut Popup, pal: &Palette, icons: &mut cra
     }
     if pop.sub_kb.is_some() && pop.sub_open.is_none() {
         if let Some(k) = pop.kb {
-            // Открытие подменю клавиатурой: вычисляем прямоугольник строки.
+            // Открытие подменю клавиатурой: вычисляем прямоугольник строки
             let mut y = rect.top() + 4.0 + if top_h > 0.0 { top_h } else { 0.0 };
             for it in pop.items.iter().take(k) {
                 y += item_h(it);
@@ -361,7 +361,7 @@ pub fn show(ctx: &egui::Context, pop: &mut Popup, pal: &Palette, icons: &mut cra
         }
     }
 
-    // Вложенное меню.
+    // Вложенное меню
     if let Some((si, srow)) = pop.sub_open {
         let sub = pop.items[si].sub.clone();
         let (sw, sh, s_icon) = measure(ctx, &sub, 0.0);
@@ -374,7 +374,7 @@ pub fn show(ctx: &egui::Context, pop: &mut Popup, pal: &Palette, icons: &mut cra
         }
         let srect = Rect::from_min_size(sp, Vec2::new(sw, sh));
         rects.push(srect);
-        // Клавиатура в подменю.
+        // Клавиатура в подменю
         if let Some(k) = pop.sub_kb {
             let sel: Vec<usize> = sub.iter().enumerate().filter(|(_, it)| !it.sep && it.enabled).map(|(i, _)| i).collect();
             if !sel.is_empty() {
@@ -452,7 +452,7 @@ pub fn show(ctx: &egui::Context, pop: &mut Popup, pal: &Palette, icons: &mut cra
     }
     pop.rects = rects.clone();
 
-    // Закрытие по щелчку вне меню.
+    // Закрытие по щелчку вне меню
     if matches!(result, PopupResult::Open) {
         let pressed = ctx.input(|i| i.pointer.any_pressed());
         if pressed && now - pop.opened > 0.05 {

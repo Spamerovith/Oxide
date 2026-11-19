@@ -1,5 +1,5 @@
 //! Своя рамка окна поверх нативной: вкладки в заголовке, как в Проводнике Windows 11,
-//! при этом остаются системная тень, скругление, привязка (Snap Layouts) и изменение размера.
+//! при этом остаются системная тень, скругление, привязка (Snap Layouts) и изменение размера
 
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
@@ -24,7 +24,7 @@ pub static PASTE_REQUEST: AtomicBool = AtomicBool::new(false);
 pub static THEME_CHANGED: AtomicBool = AtomicBool::new(false);
 static CTX: OnceLock<egui::Context> = OnceLock::new();
 
-/// Области заголовка в физических пикселях клиентской области.
+/// Области заголовка в физических пикселях клиентской области
 #[derive(Default, Clone)]
 pub struct HitRegions {
     pub caption_h: i32,
@@ -70,12 +70,12 @@ pub fn install(hwnd: HWND, ctx: &egui::Context) {
     }
 }
 
-/// Тёмная рамка окна и тёмные системные меню.
+/// Тёмная рамка окна и тёмные системные меню
 pub fn set_dark(hwnd: HWND, dark: bool) {
     unsafe {
         let v = BOOL(dark as i32);
         let _ = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &v as *const _ as *const _, 4);
-        // Недокументированные функции uxtheme: тёмные классические меню (так делает и Проводник).
+        // Недокументированные функции uxtheme: тёмные классические меню (так делает и Проводник)
         if let Ok(ux) = LoadLibraryW(windows::core::w!("uxtheme.dll")) {
             if let Some(f) = GetProcAddress(ux, PCSTR(135 as *const u8)) {
                 let set_mode: extern "system" fn(i32) -> i32 = std::mem::transmute(f);
@@ -128,7 +128,7 @@ fn inside(r: &[i32; 4], x: i32, y: i32) -> bool {
 }
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
-    // Сообщения для подменю системного контекстного меню («Отправить», «Открыть с помощью»).
+    // Сообщения для подменю системного контекстного меню («Отправить», «Открыть с помощью»)
     if matches!(msg, WM_INITMENUPOPUP | WM_DRAWITEM | WM_MEASUREITEM | WM_MENUCHAR | WM_MENUSELECT) {
         let handled = ACTIVE_MENU.with(|a| {
             if let Some(cm) = a.borrow().as_ref() {
@@ -252,7 +252,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) 
     call_old(hwnd, msg, wp, lp)
 }
 
-/// Экранные координаты курсора → логические точки egui.
+/// Экранные координаты курсора → логические точки egui
 pub fn cursor_client_points(ppp: f32) -> Option<egui::Pos2> {
     unsafe {
         let mut pt = POINT::default();
@@ -262,7 +262,7 @@ pub fn cursor_client_points(ppp: f32) -> Option<egui::Pos2> {
     }
 }
 
-/// Логические точки клиентской области → экран (для системных меню).
+/// Логические точки клиентской области → экран (для системных меню)
 pub fn client_to_screen(p: egui::Pos2, ppp: f32) -> (i32, i32) {
     unsafe {
         let mut pt = POINT { x: (p.x * ppp) as i32, y: (p.y * ppp) as i32 };

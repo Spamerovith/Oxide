@@ -1,4 +1,4 @@
-//! Горячие клавиши — те же, что в Проводнике Windows 11.
+//! Горячие клавиши - те же, что в Проводнике Windows 11
 
 use std::sync::atomic::Ordering;
 
@@ -17,7 +17,7 @@ pub fn handle(app: &mut OxideApp, ctx: &egui::Context) {
     let popup = app.popup.is_some() || app.dialog.is_some();
     let a = app.active;
 
-    // Кнопки мыши «Назад» / «Вперёд».
+    // Кнопки мыши «Назад» / «Вперёд»
     let (back_btn, fwd_btn) = ctx.input(|i| (i.pointer.button_pressed(PointerButton::Extra1), i.pointer.button_pressed(PointerButton::Extra2)));
     if back_btn && !popup {
         app.go_back(ctx);
@@ -26,7 +26,7 @@ pub fn handle(app: &mut OxideApp, ctx: &egui::Context) {
         app.go_forward(ctx);
     }
 
-    // Ctrl+колесо — смена размера значков.
+    // Ctrl+колесо - смена размера значков
     let zoom = ctx.input(|i| if i.modifiers.ctrl { i.raw_scroll_delta.y } else { 0.0 });
     if zoom != 0.0 && !popup && app.tab().loc.is_listing() {
         let order = [ViewMode::Details, ViewMode::List, ViewMode::Small, ViewMode::Medium, ViewMode::Large, ViewMode::ExtraLarge];
@@ -41,7 +41,7 @@ pub fn handle(app: &mut OxideApp, ctx: &egui::Context) {
         return;
     }
 
-    // Глобальные (работают и при вводе текста).
+    // Глобальные (работают и при вводе текста)
     let cs = Modifiers::CTRL | Modifiers::SHIFT;
     if pressed(ctx, Modifiers::CTRL, Key::T) {
         app.exec(ctx, Cmd::NewTab);
@@ -109,7 +109,7 @@ pub fn handle(app: &mut OxideApp, ctx: &egui::Context) {
         return;
     }
     if !app.tab().loc.is_listing() && !app.tab().searching() {
-        // Главная / Этот компьютер: только навигационные клавиши.
+        // Главная / Этот компьютер: только навигационные клавиши
         if pressed(ctx, Modifiers::NONE, Key::Backspace) {
             app.go_back(ctx);
         }
@@ -117,7 +117,7 @@ pub fn handle(app: &mut OxideApp, ctx: &egui::Context) {
         return;
     }
 
-    // Буфер обмена: Ctrl+C / Ctrl+X приходят событиями, Ctrl+V — через оконную процедуру.
+    // Буфер обмена: Ctrl+C / Ctrl+X приходят событиями, Ctrl+V - через оконную процедуру
     let (copy, cut) = ctx.input(|i| (i.events.iter().any(|e| matches!(e, Event::Copy)), i.events.iter().any(|e| matches!(e, Event::Cut))));
     let shift_copy = ctx.input(|i| i.modifiers.ctrl && i.modifiers.shift);
     if copy && shift_copy {
@@ -166,7 +166,7 @@ pub fn handle(app: &mut OxideApp, ctx: &egui::Context) {
     let shift_f10 = pressed(ctx, Modifiers::SHIFT, Key::F10);
     let ctx_key = ctx.input(|i| i.events.iter().any(|e| matches!(e, Event::Key { key: Key::F10, pressed: true, modifiers, .. } if modifiers.shift)));
     if shift_f10 || ctx_key {
-        // Как в Windows 11: Shift+F10 сразу открывает полное классическое меню.
+        // Как в Windows 11: Shift+F10 сразу открывает полное классическое меню
         let pos = focus_pos(app).unwrap_or(app.content_rect.center());
         app.show_system_menu(ctx, pos, false);
     }
@@ -175,7 +175,7 @@ pub fn handle(app: &mut OxideApp, ctx: &egui::Context) {
         return;
     }
 
-    // Стрелки, Home/End, PageUp/PageDown.
+    // Стрелки, Home/End, PageUp/PageDown
     let n = app.tab().order.len();
     if n == 0 {
         return;
@@ -241,7 +241,7 @@ pub fn handle(app: &mut OxideApp, ctx: &egui::Context) {
                 t.anchor = Some(cur);
             }
         } else if mods.ctrl {
-            // Только фокус.
+            // Только фокус
         } else {
             let idx = t.order[tg];
             t.select_only(idx);
@@ -258,7 +258,7 @@ pub fn handle(app: &mut OxideApp, ctx: &egui::Context) {
         }
     }
 
-    // Поиск по первым буквам (как в Проводнике).
+    // Поиск по первым буквам (как в Проводнике)
     let typed: String = ctx.input(|i| {
         i.events
             .iter()

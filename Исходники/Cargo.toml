@@ -1,8 +1,8 @@
 [package]
 name = "oxide"
-version = "1.0.3"
+version = "1.1.0"
 edition = "2021"
-description = "Oxide — быстрый проводник для Windows в стиле Windows 11"
+description = "Oxide - быстрый проводник для Windows в стиле Windows 11"
 build = "build.rs"
 
 [dependencies]

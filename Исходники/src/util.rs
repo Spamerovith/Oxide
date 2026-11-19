@@ -1,4 +1,4 @@
-//! Общие помощники: строки UTF-16, реестр, форматирование дат/размеров, естественная сортировка.
+//! Общие помощники: строки UTF-16, реестр, форматирование дат/размеров, естественная сортировка
 
 use std::cmp::Ordering;
 use std::os::windows::ffi::OsStrExt;
@@ -88,7 +88,7 @@ pub fn reg_read_multi(root: HKEY, sub: &str, name: &str) -> Vec<String> {
     w.split(|&c| c == 0).filter(|s| !s.is_empty()).map(String::from_utf16_lossy).collect()
 }
 
-/// FILETIME (u64) → локальная дата «dd.MM.yyyy H:mm» по формату пользователя.
+/// FILETIME (u64) → локальная дата «dd.MM.yyyy H:mm» по формату пользователя
 pub fn format_filetime(ft: u64) -> String {
     if ft == 0 {
         return String::new();
@@ -116,7 +116,7 @@ pub fn format_filetime(ft: u64) -> String {
     }
 }
 
-/// Размер в КБ, как в столбце «Размер» Проводника («1 234 КБ»).
+/// Размер в КБ, как в столбце «Размер» Проводника («1 234 КБ»)
 pub fn format_kb(size: u64) -> String {
     let mut buf = [0u16; 64];
     unsafe {
@@ -125,7 +125,7 @@ pub fn format_kb(size: u64) -> String {
     from_wide(&buf)
 }
 
-/// Размер в удобных единицах («1,52 МБ»).
+/// Размер в удобных единицах («1,52 МБ»)
 pub fn format_bytes(size: u64) -> String {
     let mut buf = [0u16; 64];
     unsafe {
@@ -143,7 +143,7 @@ pub fn now_filetime() -> u64 {
     (d.as_nanos() / 100) as u64 + 116_444_736_000_000_000
 }
 
-/// Естественное сравнение имён, как StrCmpLogicalW: регистр не важен, числа сравниваются по значению.
+/// Естественное сравнение имён, как StrCmpLogicalW: регистр не важен, числа сравниваются по значению
 pub fn natural_cmp(a: &str, b: &str) -> Ordering {
     let mut ai = a.chars().peekable();
     let mut bi = b.chars().peekable();
@@ -211,12 +211,12 @@ pub fn fold(c: char) -> char {
     }
 }
 
-/// Строка в нижнем регистре для поиска.
+/// Строка в нижнем регистре для поиска
 pub fn lower(s: &str) -> String {
     s.chars().map(fold).collect()
 }
 
-/// Русская форма числительного: 1 элемент, 2 элемента, 5 элементов.
+/// Русская форма числительного: 1 элемент, 2 элемента, 5 элементов
 pub fn plural<'a>(n: usize, one: &'a str, few: &'a str, many: &'a str) -> &'a str {
     let n10 = n % 10;
     let n100 = n % 100;
@@ -229,7 +229,7 @@ pub fn plural<'a>(n: usize, one: &'a str, few: &'a str, many: &'a str) -> &'a st
     }
 }
 
-/// Проверка имени файла на недопустимые символы.
+/// Проверка имени файла на недопустимые символы
 pub fn invalid_name_char(name: &str) -> Option<char> {
     name.chars().find(|c| matches!(c, '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || (*c as u32) < 32)
 }
@@ -238,7 +238,7 @@ pub fn exe_path() -> std::path::PathBuf {
     std::env::current_exe().unwrap_or_else(|_| "oxide.exe".into())
 }
 
-/// Открыть новое окно Oxide.
+/// Открыть новое окно Oxide
 pub fn spawn_window(arg: Option<&str>) {
     let mut cmd = std::process::Command::new(exe_path());
     if let Some(a) = arg {
@@ -247,7 +247,7 @@ pub fn spawn_window(arg: Option<&str>) {
     let _ = cmd.spawn();
 }
 
-/// Отладочный журнал (только если задана переменная OXIDE_DEBUG).
+/// Отладочный журнал (только если задана переменная OXIDE_DEBUG)
 pub fn log(s: &str) {
     if std::env::var_os("OXIDE_DEBUG").is_none() {
         return;
