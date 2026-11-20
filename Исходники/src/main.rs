@@ -30,6 +30,8 @@ fn main() -> eframe::Result<()> {
         .with_app_id("Oxide.Explorer")
         .with_min_inner_size([560.0, 380.0])
         .with_decorations(true)
+        // Прозрачный буфер нужен теме «Жидкое стекло»; остальные темы закрашивают фон сами
+        .with_transparent(true)
         .with_drag_and_drop(true);
     match settings.window {
         Some([x, y, w, h]) => {

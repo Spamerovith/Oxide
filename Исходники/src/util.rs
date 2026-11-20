@@ -304,3 +304,9 @@ pub fn log(s: &str) {
         let _ = writeln!(f, "{s}");
     }
 }
+
+/// Время двойного щелчка Windows в секундах
+pub fn double_click_time() -> f64 {
+    let ms = unsafe { windows::Win32::UI::Input::KeyboardAndMouse::GetDoubleClickTime() };
+    (if ms == 0 { 500 } else { ms }) as f64 / 1000.0
+}

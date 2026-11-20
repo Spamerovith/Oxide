@@ -15,10 +15,11 @@ pub enum ThemeChoice {
     Graphite,
     Nordic,
     Paper,
+    Glass,
 }
 
 impl ThemeChoice {
-    pub const ALL: [ThemeChoice; 7] = [
+    pub const ALL: [ThemeChoice; 8] = [
         ThemeChoice::System,
         ThemeChoice::Light,
         ThemeChoice::Dark,
@@ -26,6 +27,7 @@ impl ThemeChoice {
         ThemeChoice::Graphite,
         ThemeChoice::Nordic,
         ThemeChoice::Paper,
+        ThemeChoice::Glass,
     ];
     pub fn title(self) -> &'static str {
         match self {
@@ -36,6 +38,7 @@ impl ThemeChoice {
             ThemeChoice::Graphite => tr("Графит"),
             ThemeChoice::Nordic => tr("Северная ночь"),
             ThemeChoice::Paper => tr("Бумага"),
+            ThemeChoice::Glass => tr("Жидкое стекло"),
         }
     }
 }
@@ -43,6 +46,10 @@ impl ThemeChoice {
 #[derive(Clone, Debug)]
 pub struct Palette {
     pub dark: bool,
+    /// Полупрозрачные слои поверх размытия Windows (тема «Жидкое стекло»)
+    pub glass: bool,
+    /// Яркость бликов по краям стеклянных элементов (0 - нет)
+    pub shine: f32,
     pub base: Color32,
     pub layer: Color32,
     pub cmdbar: Color32,
@@ -84,6 +91,8 @@ impl Palette {
     pub fn light(accent: Option<[Color32; 8]>) -> Self {
         Palette {
             dark: false,
+            glass: false,
+            shine: 0.0,
             base: hex(0xF3F3F3),
             layer: hex(0xFBFBFB),
             cmdbar: hex(0xF9F9F9),
@@ -116,6 +125,8 @@ impl Palette {
     pub fn dark(accent: Option<[Color32; 8]>) -> Self {
         Palette {
             dark: true,
+            glass: false,
+            shine: 0.0,
             base: hex(0x202020),
             layer: hex(0x2C2C2C),
             cmdbar: hex(0x282828),
@@ -251,6 +262,108 @@ impl Palette {
         p
     }
 
+    /// Жидкое стекло - прозрачные слои над размытым рабочим столом, светлые блики по краям,
+    /// синий акцент. Светлое или тёмное, как Windows
+    pub fn glass(dark: bool) -> Self {
+        // Каждая панель залита целиком своим цветом (панели не перекрываются), поэтому
+        // у строки адреса и командной панели свой тон, а не надбавка к фону
+        let mut p = if dark { Palette::dark(None) } else { Palette::light(None) };
+        p.glass = true;
+        if dark {
+            p.base = rgba(0x14181F8C);
+            p.layer = rgba(0x2A2F39A6);
+            p.cmdbar = rgba(0x1E222A99);
+            p.divider = rgba(0xFFFFFF1F);
+            p.field = rgba(0xFFFFFF1C);
+            p.field_hover = rgba(0xFFFFFF29);
+            p.field_stroke = rgba(0xFFFFFF33);
+            p.text = hex(0xFFFFFF);
+            p.text2 = hex(0xDCE0E8);
+            p.text3 = hex(0xA9AFBA);
+            p.text_disabled = hex(0x6E7480);
+            p.hover = rgba(0xFFFFFF1A);
+            p.pressed = rgba(0xFFFFFF12);
+            p.selected = rgba(0xFFFFFF33);
+            p.selected_hover = rgba(0xFFFFFF40);
+            p.nav_selected = rgba(0xFFFFFF26);
+            p.accent = hex(0x0A84FF);
+            p.on_accent = hex(0xFFFFFF);
+            p.flyout = rgba(0x262A33F2);
+            p.flyout_stroke = rgba(0xFFFFFF38);
+            p.shadow = rgba(0x00000066);
+            p.bar_track = rgba(0xFFFFFF1F);
+            p.focus = hex(0xFFFFFF);
+        } else {
+            p.base = rgba(0xF2F4F899);
+            p.layer = rgba(0xFCFDFFB8);
+            p.cmdbar = rgba(0xF7F8FBA6);
+            p.divider = rgba(0x0000001A);
+            p.field = rgba(0xFFFFFFB3);
+            p.field_hover = rgba(0xFFFFFFD9);
+            p.field_stroke = rgba(0x0000001F);
+            p.text = hex(0x1C1C1E);
+            p.text2 = hex(0x3C3C43);
+            p.text3 = hex(0x66666D);
+            p.text_disabled = hex(0x9E9EA4);
+            p.hover = rgba(0xFFFFFF80);
+            p.pressed = rgba(0xFFFFFF59);
+            p.selected = rgba(0x007AFF2E);
+            p.selected_hover = rgba(0x007AFF40);
+            p.nav_selected = rgba(0xFFFFFF99);
+            p.accent = hex(0x007AFF);
+            p.on_accent = hex(0xFFFFFF);
+            p.flyout = rgba(0xF9FAFCF2);
+            p.flyout_stroke = rgba(0x00000024);
+            p.shadow = rgba(0x00000033);
+            p.bar_track = rgba(0x0000001A);
+            p.focus = hex(0x1C1C1E);
+        }
+        p.marquee = p.accent;
+        p.shine = 0.7;
+        p
+    }
+
+    /// Настройки стекла пользователя: прозрачность слоёв и яркость бликов
+    pub fn tune_glass(mut self, clarity: f32, shine: f32) -> Self {
+        if !self.glass {
+            return self;
+        }
+        let clarity = clarity.clamp(0.0, 1.0);
+        let base_a = 0.92 - 0.86 * clarity;
+        let with_a = |c: Color32, a: f32| {
+            let [r, g, b, _] = c.to_srgba_unmultiplied();
+            Color32::from_rgba_unmultiplied(r, g, b, (a.clamp(0.0, 1.0) * 255.0).round() as u8)
+        };
+        self.base = with_a(self.base, base_a);
+        self.layer = with_a(self.layer, base_a + 0.12);
+        self.cmdbar = with_a(self.cmdbar, base_a + 0.06);
+        self.shine = shine.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Если Windows не умеет размытие под окном, стекло становится непрозрачным: слои
+    /// смешиваются с подложкой заранее
+    pub fn solid(mut self) -> Self {
+        if !self.glass {
+            return self;
+        }
+        let under = if self.dark { hex(0x1C2028) } else { hex(0xE9ECF2) };
+        let flat = |c: Color32, under: Color32| {
+            let [r, g, b, a] = c.to_srgba_unmultiplied();
+            let k = a as f32 / 255.0;
+            let mix = |o: u8, u: u8| (u as f32 * (1.0 - k) + o as f32 * k).round() as u8;
+            Color32::from_rgb(mix(r, under.r()), mix(g, under.g()), mix(b, under.b()))
+        };
+        self.base = flat(self.base, under);
+        let base = self.base;
+        for c in [&mut self.layer, &mut self.cmdbar, &mut self.field, &mut self.field_hover, &mut self.flyout] {
+            *c = flat(*c, base);
+        }
+        self.glass = false;
+        self.shine = 0.0;
+        self
+    }
+
     pub fn resolve(choice: ThemeChoice, system_dark: bool, accent: Option<[Color32; 8]>) -> Self {
         match choice {
             ThemeChoice::System => {
@@ -266,6 +379,7 @@ impl Palette {
             ThemeChoice::Graphite => Palette::graphite(accent),
             ThemeChoice::Nordic => Palette::nordic(),
             ThemeChoice::Paper => Palette::paper(),
+            ThemeChoice::Glass => Palette::glass(system_dark),
         }
     }
 
@@ -277,6 +391,10 @@ impl Palette {
             return overlay;
         }
         let bg = SURFACE.with(|s| s.get());
+        if bg.a() < 255 {
+            // Подложка прозрачная (стекло): смешает видеокарта
+            return overlay;
+        }
         let k = a as f32 / 255.0;
         let mix = |o: u8, u: u8| (u as f32 * (1.0 - k) + o as f32 * k).round() as u8;
         Color32::from_rgb(mix(r, bg.r()), mix(g, bg.g()), mix(b, bg.b()))

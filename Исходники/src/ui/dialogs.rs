@@ -204,6 +204,22 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
         if let Some(t) = pick {
             app.set_theme(&ctx, t);
         }
+        if app.settings.theme == ThemeChoice::Glass {
+            // Стекло настраивается вручную: сколько видно за окном, размытие, блики
+            let mut clarity = app.settings.glass_clarity;
+            let mut shine = app.settings.glass_shine;
+            let mut blur = app.settings.glass_blur;
+            let mut changed = slider(ui, &mut clarity, tr("Прозрачность стекла"), &pal).changed();
+            changed |= slider(ui, &mut shine, tr("Блики и переливы"), &pal).changed();
+            changed |= toggle(ui, &mut blur, tr("Размывать то, что за окном"), &pal).changed();
+            if changed {
+                app.settings.glass_clarity = clarity;
+                app.settings.glass_shine = shine;
+                app.settings.glass_blur = blur;
+                app.apply_theme(&ctx);
+                app.mark_settings(&ctx);
+            }
+        }
 
         group_title(ui, &pal, l("Язык", "Language"));
         ui.horizontal(|ui| {
@@ -376,6 +392,14 @@ fn updates(app: &mut OxideApp, ui: &mut Ui, pal: &Palette) {
 /// Миниатюра окна в выбранной теме
 fn mini_window(ui: &Ui, r: Rect, p: &Palette) {
     let pt = ui.painter();
+    if p.glass {
+        // Под стеклом в превью - условные «обои», чтобы было видно прозрачность
+        let rad = m::R_OVERLAY;
+        pt.rect_filled(r, CornerRadius::same(rad), egui::Color32::from_rgb(0x3D, 0x7B, 0xF2));
+        let half = Rect::from_min_max(Pos2::new(r.center().x, r.top()), r.max);
+        pt.rect_filled(half, CornerRadius { nw: 0, sw: 0, ne: rad, se: rad }, egui::Color32::from_rgb(0xC2, 0x5B, 0xD9));
+        pt.circle_filled(Pos2::new(r.left() + r.width() * 0.3, r.bottom() - 18.0), 16.0, egui::Color32::from_rgb(0xFF, 0xB3, 0x47));
+    }
     pt.rect_filled(r, CornerRadius::same(m::R_OVERLAY), p.base);
     let tab = Rect::from_min_size(r.min + Vec2::new(8.0, 6.0), Vec2::new(48.0, 10.0));
     pt.rect_filled(tab, CornerRadius { nw: 3, ne: 3, sw: 0, se: 0 }, p.layer);

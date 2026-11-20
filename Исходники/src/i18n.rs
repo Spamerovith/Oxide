@@ -141,6 +141,10 @@ const EN: &[(&str, &str)] = &[
     ("Атрибуты", "Attributes"),
     ("Больше не показывать", "Don't show again"),
     ("Бумага", "Paper"),
+    ("Жидкое стекло", "Liquid Glass"),
+    ("Прозрачность стекла", "Glass transparency"),
+    ("Блики и переливы", "Highlights and shimmer"),
+    ("Размывать то, что за окном", "Blur what's behind the window"),
     ("Быстрый доступ", "Quick access"),
     (
         "Быстрый проводник для Windows на Rust. Интерфейс повторяет Проводник Windows 11, а файловые операции выполняет сам движок Windows",

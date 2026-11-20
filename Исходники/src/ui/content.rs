@@ -29,6 +29,8 @@ pub struct Lay {
     cols: usize,
     rows: usize,
     pad: Vec2,
+    /// Шаг столбцов сетки: как в Проводнике, свободное место по ширине делится между столбцами поровну
+    step_x: f32,
     pub total: Vec2,
 }
 
@@ -39,7 +41,8 @@ impl Lay {
             Flow::Grid => (pos % self.cols.max(1), pos / self.cols.max(1)),
             Flow::Columns => (pos / self.rows.max(1), pos % self.rows.max(1)),
         };
-        Rect::from_min_size(Pos2::new(self.pad.x + c as f32 * self.cell.x, self.pad.y + r as f32 * self.cell.y), self.cell)
+        let x = self.pad.x + c as f32 * self.step_x + (self.step_x - self.cell.x) / 2.0;
+        Rect::from_min_size(Pos2::new(x.round(), self.pad.y + r as f32 * self.cell.y), self.cell)
     }
     fn visible(&self, clip: Rect, n: usize) -> std::ops::Range<usize> {
         match self.flow {
@@ -98,7 +101,7 @@ pub fn layout(view: ViewMode, n: usize, avail: Vec2, compact: bool, cols_w: f32)
         ViewMode::Content => (Flow::Rows, Vec2::new(avail.x - 8.0, if compact { 52.0 } else { 60.0 })),
         ViewMode::Tiles => (Flow::Grid, Vec2::new(272.0, if compact { 68.0 } else { 76.0 })),
         ViewMode::ExtraLarge => (Flow::Grid, Vec2::new(272.0, 256.0 + 56.0)),
-        ViewMode::Large => (Flow::Grid, Vec2::new(124.0, 96.0 + 56.0)),
+        ViewMode::Large => (Flow::Grid, Vec2::new(112.0, 96.0 + 56.0)),
         ViewMode::Medium => (Flow::Grid, Vec2::new(88.0, 48.0 + 52.0)),
         ViewMode::Small => (Flow::Grid, Vec2::new(232.0, row_h)),
         ViewMode::List => (Flow::Columns, Vec2::new(260.0, row_h)),
@@ -123,7 +126,11 @@ pub fn layout(view: ViewMode, n: usize, avail: Vec2, compact: bool, cols_w: f32)
         Flow::Grid => Vec2::new(avail.x, rows as f32 * cell.y + pad.y * 2.0 + 24.0),
         Flow::Columns => Vec2::new(cols as f32 * cell.x + pad.x * 2.0, avail.y),
     };
-    Lay { flow, cell, cols, rows, pad, total }
+    let step_x = match flow {
+        Flow::Grid => ((avail.x - pad.x * 2.0) / cols as f32).max(cell.x),
+        _ => cell.x,
+    };
+    Lay { flow, cell, cols, rows, pad, step_x, total }
 }
 
 /// Ключ и путь системного значка для элемента
@@ -445,7 +452,12 @@ fn body(app: &mut OxideApp, ui: &mut Ui, lay: Lay, view: ViewMode) {
                 t.focus = Some(pos);
             } else if !selected {
                 t.select_only(ei);
+                t.rename_click = None;
             } else {
+                // Нажали на имя единственного выделенного элемента - возможно, это щелчок для переименования
+                let only = t.sel.iter().filter(|s| **s).count() == 1;
+                let armed = only && name_rect.contains(ptr) && !t.is_virtual() && t.rename.is_none() && e.shell.is_none();
+                t.rename_click = if armed { Some((ei, f64::INFINITY)) } else { None };
                 t.press_item = Some(ei);
                 t.focus = Some(pos);
             }
@@ -457,9 +469,19 @@ fn body(app: &mut OxideApp, ui: &mut Ui, lay: Lay, view: ViewMode) {
         if resp.clicked() && !mods.ctrl && !mods.shift && app.tabs[a].press_item == Some(ei) {
             app.tabs[a].select_only(ei);
             app.tabs[a].press_item = None;
+            // Щелчок отпущен на месте: ждём, не будет ли второго
+            if let Some((ri, at)) = app.tabs[a].rename_click.as_mut() {
+                if *ri == ei && at.is_infinite() {
+                    *at = ctx.input(|i| i.time);
+                }
+            }
         }
         if resp.double_clicked() && !mods.ctrl {
+            app.tabs[a].rename_click = None;
             open_idx = Some((ei, false));
+        }
+        if resp.drag_started() {
+            app.tabs[a].rename_click = None;
         }
         if resp.middle_clicked() && e.is_dir {
             open_idx = Some((ei, true));
@@ -486,6 +508,26 @@ fn body(app: &mut OxideApp, ui: &mut Ui, lay: Lay, view: ViewMode) {
                 tip.push_str(&trf("\nДата изменения: {}", &[&crate::util::format_filetime(e.mtime)]));
             }
             resp.on_hover_text(tip);
+        }
+    }
+
+    // Отложенное переименование по щелчку
+    if let Some((ri, at)) = app.tabs[a].rename_click {
+        let wait = crate::util::double_click_time();
+        let now = ctx.input(|i| i.time);
+        let still = app.tabs[a].sel.get(ri).copied().unwrap_or(false) && app.tabs[a].sel.iter().filter(|s| **s).count() == 1;
+        // Отпустили не щелчком (увели мышь, потянули) - отмена
+        if !still || (at.is_infinite() && !ctx.input(|i| i.pointer.primary_down())) {
+            app.tabs[a].rename_click = None;
+        } else if at.is_finite() {
+            if now - at >= wait {
+                app.tabs[a].rename_click = None;
+                if open_idx.is_none() {
+                    app.start_rename();
+                }
+            } else {
+                ctx.request_repaint_after(std::time::Duration::from_secs_f64((wait - (now - at)).max(0.01)));
+            }
         }
     }
 
@@ -712,7 +754,7 @@ fn paint_item(
             let w = r.width() - 12.0;
             if !renaming {
                 let mut job = LayoutJob::single_section(e.display.clone(), TextFormat::simple(font(12.0), name_col));
-                job.wrap = TextWrapping { max_width: w, max_rows: if selected { 4 } else { 2 }, break_anywhere: true, overflow_character: Some('…') };
+                job.wrap = TextWrapping { max_width: w, max_rows: if selected { 4 } else { 2 }, break_anywhere: false, overflow_character: Some('…') };
                 job.halign = egui::Align::Center;
                 let g = ui.fonts(|f| f.layout_job(job));
                 p.galley(Pos2::new(r.center().x, ty).round(), g, name_col);

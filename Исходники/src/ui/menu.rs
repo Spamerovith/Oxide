@@ -257,6 +257,7 @@ pub fn show(ctx: &egui::Context, pop: &mut Popup, pal: &Palette, icons: &mut cra
         painter.add(shadow.as_shape(rect, CornerRadius::same(m::R_OVERLAY)));
         painter.rect_filled(rect, CornerRadius::same(m::R_OVERLAY), pal.flyout);
         painter.rect_stroke(rect, CornerRadius::same(m::R_OVERLAY), Stroke::new(1.0, pal.flyout_stroke), StrokeKind::Inside);
+        glass_rim(painter, rect, m::R_OVERLAY as f32, &pal);
         let bg = ui.interact(rect, Id::new(("popup-bg", pop.id)), Sense::click());
         let _ = bg;
 
@@ -409,6 +410,7 @@ pub fn show(ctx: &egui::Context, pop: &mut Popup, pal: &Palette, icons: &mut cra
             painter.add(shadow.as_shape(srect, CornerRadius::same(m::R_OVERLAY)));
             painter.rect_filled(srect, CornerRadius::same(m::R_OVERLAY), pal.flyout);
             painter.rect_stroke(srect, CornerRadius::same(m::R_OVERLAY), Stroke::new(1.0, pal.flyout_stroke), StrokeKind::Inside);
+            glass_rim(painter, srect, m::R_OVERLAY as f32, &pal);
             let mut y = srect.top() + 4.0;
             for (i, it) in sub.iter().enumerate() {
                 let ih = item_h(it);

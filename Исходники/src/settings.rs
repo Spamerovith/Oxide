@@ -61,6 +61,12 @@ pub struct Settings {
     pub check_updates: bool,
     /// Папки, диски, Win+E и «Показать в папке» открываются в Oxide
     pub default_explorer: bool,
+    /// «Жидкое стекло»: насколько видно то, что за окном (0 - матовое, 1 - почти прозрачное)
+    pub glass_clarity: f32,
+    /// «Жидкое стекло»: размывать то, что за окном
+    pub glass_blur: bool,
+    /// «Жидкое стекло»: яркость бликов и переливов по краям
+    pub glass_shine: f32,
 }
 
 impl Default for Settings {
@@ -92,6 +98,9 @@ impl Default for Settings {
             language: None,
             check_updates: true,
             default_explorer: false,
+            glass_clarity: 0.55,
+            glass_blur: true,
+            glass_shine: 0.7,
         }
     }
 }

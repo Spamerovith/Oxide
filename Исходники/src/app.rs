@@ -120,6 +120,9 @@ pub struct Tab {
     pub type_ahead: (String, f64),
     pub watcher: Option<notify::RecommendedWatcher>,
     pub press_item: Option<usize>,
+    /// Щелчок по имени уже выделенного элемента: если за время двойного щелчка второго не было,
+    /// начинается переименование, как в Проводнике. (элемент, время щелчка)
+    pub rename_click: Option<(usize, f64)>,
     pub grid_cols: usize,
     pub list_rows: usize,
     pub page_items: usize,
@@ -158,6 +161,7 @@ impl Tab {
             type_ahead: (String::new(), 0.0),
             watcher: None,
             press_item: None,
+            rename_click: None,
             grid_cols: 1,
             list_rows: 1,
             page_items: 10,
@@ -362,8 +366,7 @@ impl OxideApp {
         let system_dark = theme::system_is_dark();
         let accent = theme::system_accent_palette();
         let animations = theme::system_animations_enabled();
-        let pal = Palette::resolve(settings.theme, system_dark, accent);
-        theme::apply(&ctx, &pal, animations);
+        let mut pal = Palette::resolve(settings.theme, system_dark, accent).tune_glass(settings.glass_clarity, settings.glass_shine);
 
         let mut hwnd_ok = false;
         {
@@ -373,10 +376,17 @@ impl OxideApp {
                     let hwnd = windows::Win32::Foundation::HWND(w.hwnd.get() as *mut _);
                     window::install(hwnd, &ctx);
                     window::set_dark(hwnd, pal.dark);
+                    if !window::set_glass(hwnd, pal.glass, settings.glass_blur) {
+                        pal = pal.solid();
+                    }
                     hwnd_ok = true;
                 }
             }
         }
+        if !hwnd_ok {
+            pal = pal.solid();
+        }
+        theme::apply(&ctx, &pal, animations);
 
         let (tx, rx) = channel();
         let engine = Arc::new(SearchEngine::new());
@@ -2047,7 +2057,10 @@ impl OxideApp {
         self.system_dark = theme::system_is_dark();
         self.accent = theme::system_accent_palette();
         self.animations = theme::system_animations_enabled();
-        self.pal = Palette::resolve(self.settings.theme, self.system_dark, self.accent);
+        self.pal = Palette::resolve(self.settings.theme, self.system_dark, self.accent).tune_glass(self.settings.glass_clarity, self.settings.glass_shine);
+        if !self.hwnd_ok || !window::set_glass(window::hwnd(), self.pal.glass, self.settings.glass_blur) {
+            self.pal = std::mem::replace(&mut self.pal, Palette::light(None)).solid();
+        }
         theme::apply(ctx, &self.pal, self.animations);
         if self.hwnd_ok && self.last_dark_applied != Some(self.pal.dark) {
             window::set_dark(window::hwnd(), self.pal.dark);
@@ -2167,6 +2180,10 @@ impl eframe::App for OxideApp {
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        if self.pal.glass {
+            // Под окном размытие Windows: фон не закрашиваем
+            return [0.0; 4];
+        }
         let c = self.pal.base;
         [c.r() as f32 / 255.0, c.g() as f32 / 255.0, c.b() as f32 / 255.0, 1.0]
     }

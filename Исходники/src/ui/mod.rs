@@ -81,6 +81,12 @@ pub fn frame(app: &mut OxideApp, ctx: &egui::Context) {
             _ => content::show(app, ui),
         }
     });
+
+    // Стекло: блик по краю всего окна
+    if pal.glass && !crate::shell::window::is_maximized() {
+        let p = ctx.layer_painter(egui::LayerId::new(egui::Order::Middle, egui::Id::new("glass-edge")));
+        glass_rim(&p, ctx.screen_rect(), 8.0, &pal);
+    }
 }
 
 /// Короткое уведомление внизу окна

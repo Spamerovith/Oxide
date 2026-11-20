@@ -70,6 +70,23 @@ pub fn install(hwnd: HWND, ctx: &egui::Context) {
     }
 }
 
+/// Размытие рабочего стола под окном (акрил Windows 11). Возвращает false, если Windows не умеет
+pub fn set_glass(hwnd: HWND, on: bool, blur: bool) -> bool {
+    use windows::Win32::Graphics::Dwm::{DwmExtendFrameIntoClientArea, DWMSBT_NONE, DWMSBT_TRANSIENTWINDOW, DWMWA_SYSTEMBACKDROP_TYPE};
+    unsafe {
+        let kind = if on && blur { DWMSBT_TRANSIENTWINDOW } else { DWMSBT_NONE };
+        // Без размытия окно просто прозрачное: это работает и там, где Windows не умеет акрил
+        let ok = DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &kind as *const _ as *const _, 4).is_ok() || !blur;
+        let m = if on && ok {
+            MARGINS { cxLeftWidth: -1, cxRightWidth: -1, cyTopHeight: -1, cyBottomHeight: -1 }
+        } else {
+            MARGINS { cxLeftWidth: 0, cxRightWidth: 0, cyTopHeight: 1, cyBottomHeight: 0 }
+        };
+        let _ = DwmExtendFrameIntoClientArea(hwnd, &m);
+        !on || ok
+    }
+}
+
 /// Тёмная рамка окна и тёмные системные меню
 pub fn set_dark(hwnd: HWND, dark: bool) {
     unsafe {
@@ -150,41 +167,40 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) 
 
     match msg {
         WM_NCCALCSIZE if wp.0 != 0 => {
+            // Слева, справа и снизу рамка остаётся системной: она невидима и лежит за краем окна,
+            // как у Проводника, поэтому не мешает брать полосу прокрутки. Убираем только заголовок
+            let params = &mut *(lp.0 as *mut NCCALCSIZE_PARAMS);
+            let top = params.rgrc[0].top;
+            let r = DefWindowProcW(hwnd, msg, wp, lp);
+            let params = &mut *(lp.0 as *mut NCCALCSIZE_PARAMS);
+            params.rgrc[0].top = top;
             if IsZoomed(hwnd).as_bool() {
-                let params = &mut *(lp.0 as *mut NCCALCSIZE_PARAMS);
-                let (fx, fy) = frame_thickness(hwnd);
-                params.rgrc[0].left += fx;
-                params.rgrc[0].right -= fx;
-                params.rgrc[0].top += fy;
-                params.rgrc[0].bottom -= fy;
+                params.rgrc[0].top += frame_thickness(hwnd).1;
             }
-            return LRESULT(0);
+            return r;
         }
         WM_NCHITTEST => {
             let mut pt = POINT { x: (lp.0 & 0xFFFF) as i16 as i32, y: ((lp.0 >> 16) & 0xFFFF) as i16 as i32 };
             let _ = ScreenToClient(hwnd, &mut pt);
             let mut rc = RECT::default();
             let _ = GetClientRect(hwnd, &mut rc);
+            // Левая, правая и нижняя рамки - за краем окна, их обслуживает Windows
+            let def = DefWindowProcW(hwnd, msg, wp, lp);
+            if def.0 as u32 != HTCLIENT {
+                return def;
+            }
             let zoomed = IsZoomed(hwnd).as_bool();
             if !zoomed {
+                // Верхняя рамка внутри окна, как у Проводника: тонкая полоса над вкладками
                 let (fx, fy) = frame_thickness(hwnd);
-                let (bx, by) = (fx.max(4), fy.max(4));
-                let left = pt.x < bx;
-                let right = pt.x >= rc.right - bx;
-                let top = pt.y < by;
-                let bottom = pt.y >= rc.bottom - by;
-                let hit = match (top, bottom, left, right) {
-                    (true, _, true, _) => HTTOPLEFT,
-                    (true, _, _, true) => HTTOPRIGHT,
-                    (_, true, true, _) => HTBOTTOMLEFT,
-                    (_, true, _, true) => HTBOTTOMRIGHT,
-                    (true, _, _, _) => HTTOP,
-                    (_, true, _, _) => HTBOTTOM,
-                    (_, _, true, _) => HTLEFT,
-                    (_, _, _, true) => HTRIGHT,
-                    _ => HTNOWHERE,
-                };
-                if hit != HTNOWHERE {
+                if pt.y < fy.max(4) {
+                    let hit = if pt.x < fx * 2 {
+                        HTTOPLEFT
+                    } else if pt.x >= rc.right - fx * 2 {
+                        HTTOPRIGHT
+                    } else {
+                        HTTOP
+                    };
                     return LRESULT(hit as isize);
                 }
             }

@@ -175,6 +175,16 @@ fn history_menu(app: &mut OxideApp, ctx: &egui::Context, anchor: Rect, back: boo
 fn field_frame(ui: &Ui, r: Rect, pal: &crate::theme::Palette, hovered: bool, focused: bool) {
     let p = ui.painter();
     let fill = if focused { pal.field } else if hovered { pal.field_hover } else { pal.field };
+    if pal.glass {
+        // Стекло: поле-капсула с бликом по краю, фокус - кольцо акцентом
+        let cr = CornerRadius::same((r.height() / 2.0) as u8);
+        p.rect_filled(r, cr, fill);
+        if focused {
+            p.rect_stroke(r, cr, Stroke::new(1.5, pal.accent), StrokeKind::Inside);
+        }
+        super::widgets::glass_rim(p, r, r.height() / 2.0, pal);
+        return;
+    }
     p.rect_filled(r, CornerRadius::same(m::R_CTRL), fill);
     if !pal.dark {
         p.rect_stroke(r, CornerRadius::same(m::R_CTRL), Stroke::new(1.0, pal.field_stroke), StrokeKind::Inside);

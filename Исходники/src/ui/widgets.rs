@@ -388,3 +388,88 @@ pub fn scrollbar(ui: &mut Ui, id: egui::Id, area: Rect, content: f32, offset: f3
     ui.painter().rect_filled(hr, CornerRadius::same((w / 2.0) as u8), pal.fill(pal.text.gamma_multiply(a)));
     new
 }
+
+/// Ползунок WinUI (Slider): дорожка, заполненная акцентом до бегунка, подпись слева и значение в процентах
+pub fn slider(ui: &mut Ui, value: &mut f32, label: &str, pal: &Palette) -> Response {
+    let h = 36.0;
+    let w = ui.available_width();
+    let (rect, mut resp) = ui.allocate_exact_size(Vec2::new(w, h), Sense::click_and_drag());
+    let track = Rect::from_min_max(Pos2::new(rect.right() - 260.0, rect.center().y - 2.0), Pos2::new(rect.right() - 48.0, rect.center().y + 2.0));
+    if resp.dragged() || resp.clicked() {
+        if let Some(p) = resp.interact_pointer_pos() {
+            let v = ((p.x - track.left()) / track.width()).clamp(0.0, 1.0);
+            if (v - *value).abs() > f32::EPSILON {
+                *value = v;
+                resp.mark_changed();
+            }
+        }
+    }
+    if resp.has_focus() {
+        let step = ui.input(|i| (i.key_pressed(egui::Key::ArrowRight) as i32 - i.key_pressed(egui::Key::ArrowLeft) as i32) as f32 * 0.05);
+        if step != 0.0 {
+            *value = (*value + step).clamp(0.0, 1.0);
+            resp.mark_changed();
+        }
+    }
+    let p = ui.painter();
+    p.text(Pos2::new(rect.left(), rect.center().y), Align2::LEFT_CENTER, label, font(14.0), pal.text);
+    p.rect_filled(track, CornerRadius::same(2), pal.text3.gamma_multiply(0.6));
+    let x = track.left() + track.width() * *value;
+    p.rect_filled(Rect::from_min_max(track.min, Pos2::new(x, track.max.y)), CornerRadius::same(2), pal.accent);
+    let c = Pos2::new(x, track.center().y);
+    p.circle_filled(c, 10.0, pal.flyout);
+    p.circle_stroke(c, 10.0, Stroke::new(1.0, pal.flyout_stroke));
+    let r = if resp.dragged() { 5.0 } else if resp.hovered() { 7.0 } else { 6.0 };
+    p.circle_filled(c, r, pal.accent);
+    text_right(p, Pos2::new(rect.right(), rect.center().y), &format!("{} %", (*value * 100.0).round() as i32), font(14.0), pal.text2);
+    let v = *value;
+    resp.widget_info(|| egui::WidgetInfo::slider(true, v as f64, label));
+    resp
+}
+
+/// Блик по краю стеклянного элемента, как в «Жидком стекле» iOS 26: свет падает со стороны
+/// указателя мыши (без мыши - слева сверху), напротив - слабый отражённый блик, по всему краю
+/// тонкий радужный перелив. Рисуется только в теме «Жидкое стекло»
+pub fn glass_rim(p: &Painter, r: Rect, radius: f32, pal: &Palette) {
+    if !pal.glass || pal.shine <= 0.01 {
+        return;
+    }
+    use egui::epaint::{ColorMode, CornerRadiusF32, PathShape, PathStroke};
+    let c = r.center();
+    let ptr = p.ctx().pointer_latest_pos();
+    let light = ptr
+        .map(|q| q - c)
+        .filter(|v| v.length() > 1.0)
+        .map(|v| v.normalized())
+        .unwrap_or(Vec2::new(-0.7071, -0.7071));
+    let phase = ptr.map(|q| (q.x + q.y) / 1400.0).unwrap_or(0.0);
+    let half = r.size() / 2.0;
+    let (shine, dark) = (pal.shine, pal.dark);
+    let make = move |strength: f32| {
+        std::sync::Arc::new(move |_: Rect, q: Pos2| -> Color32 {
+            let d = q - c;
+            let n = Vec2::new(d.x / half.x.max(1.0), d.y / half.y.max(1.0));
+            let n = if n.length() > 0.001 { n.normalized() } else { Vec2::new(0.0, -1.0) };
+            let dot = n.x * light.x + n.y * light.y;
+            let spec = (dot.max(0.0).powi(3) + 0.45 * (-dot).max(0.0).powi(4)).min(1.0);
+            let hue = (n.y.atan2(n.x) / std::f32::consts::TAU + phase).rem_euclid(1.0);
+            let rainbow: Color32 = egui::epaint::Hsva::new(hue, 0.6, 1.0, 1.0).into();
+            // В центре блика свет белый, по краям - цветной перелив
+            let k = spec * 0.75;
+            let mix = |v: u8| (v as f32 * (1.0 - k) + 255.0 * k).round() as u8;
+            let rest = if dark { 0.14 } else { 0.3 };
+            let a = (shine * strength * (rest + 0.86 * spec)).clamp(0.0, 1.0);
+            Color32::from_rgba_unmultiplied(mix(rainbow.r()), mix(rainbow.g()), mix(rainbow.b()), (a * 255.0) as u8)
+        }) as std::sync::Arc<dyn Fn(Rect, Pos2) -> Color32 + Send + Sync>
+    };
+    // Тонкая яркая кромка и мягкое свечение внутри: стекло выглядит толстым
+    for (inset, width, strength) in [(0.6, 1.2, 1.0), (2.2, 3.0, 0.22)] {
+        let rr = r.shrink(inset);
+        if rr.width() < 2.0 || rr.height() < 2.0 {
+            continue;
+        }
+        let mut pts = Vec::new();
+        egui::epaint::tessellator::path::rounded_rectangle(&mut pts, rr, CornerRadiusF32::same((radius - inset).max(0.0)));
+        p.add(PathShape { points: pts, closed: true, fill: Color32::TRANSPARENT, stroke: PathStroke { width, color: ColorMode::UV(make(strength)), kind: StrokeKind::Middle } });
+    }
+}

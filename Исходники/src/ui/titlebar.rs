@@ -133,12 +133,21 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
             let body = Rect::from_min_max(r.min, Pos2::new(r.right(), rect.bottom()));
             p.rect_filled(body, CornerRadius { nw: 8, ne: 8, sw: 0, se: 0 }, pal.layer);
             let ear = 8.0;
-            let bl = Rect::from_min_size(Pos2::new(r.left() - ear, rect.bottom() - ear), Vec2::splat(ear));
-            p.rect_filled(bl, CornerRadius::ZERO, pal.layer);
-            p.circle_filled(Pos2::new(r.left() - ear, rect.bottom() - ear), ear, pal.base);
-            let br = Rect::from_min_size(Pos2::new(r.right(), rect.bottom() - ear), Vec2::splat(ear));
-            p.rect_filled(br, CornerRadius::ZERO, pal.layer);
-            p.circle_filled(Pos2::new(r.right() + ear, rect.bottom() - ear), ear, pal.base);
+            if pal.glass {
+                // Нижний край вкладки сливается со строкой адреса, его блик не нужен
+                let clip = p.with_clip_rect(Rect::from_min_max(r.min - Vec2::new(1.0, 1.0), Pos2::new(r.right() + 1.0, rect.bottom())));
+                glass_rim(&clip, Rect::from_min_max(r.min, Pos2::new(r.right(), rect.bottom() + 8.0)), 8.0, &pal);
+                // Прозрачный слой нельзя «вырезать» кругом цвета фона: ушки рисуем сразу вогнутыми
+                p.add(ear_shape(Pos2::new(r.left(), rect.bottom()), -ear, pal.layer));
+                p.add(ear_shape(Pos2::new(r.right(), rect.bottom()), ear, pal.layer));
+            } else {
+                let bl = Rect::from_min_size(Pos2::new(r.left() - ear, rect.bottom() - ear), Vec2::splat(ear));
+                p.rect_filled(bl, CornerRadius::ZERO, pal.layer);
+                p.circle_filled(Pos2::new(r.left() - ear, rect.bottom() - ear), ear, pal.base);
+                let br = Rect::from_min_size(Pos2::new(r.right(), rect.bottom() - ear), Vec2::splat(ear));
+                p.rect_filled(br, CornerRadius::ZERO, pal.layer);
+                p.circle_filled(Pos2::new(r.right() + ear, rect.bottom() - ear), ear, pal.base);
+            }
         } else {
             let t = ctx.animate_bool_with_time(resp.id.with("hv"), tab_hovered, m::T_HOVER);
             if t > 0.0 {
@@ -320,4 +329,22 @@ fn caption_bg(ui: &Ui, resp: &egui::Response, r: Rect, pal: &crate::theme::Palet
     } else if t > 0.0 {
         ui.painter().rect_filled(r, CornerRadius::ZERO, pal.fill(pal.hover.gamma_multiply(t)));
     }
+}
+
+/// Вогнутое «ушко» у низа активной вкладки: угол (x, низ), ear < 0 - ушко слева
+fn ear_shape(corner: Pos2, ear: f32, color: egui::Color32) -> egui::Shape {
+    let mut mesh = egui::Mesh::default();
+    mesh.colored_vertex(corner, color);
+    let center = Pos2::new(corner.x + ear, corner.y - ear.abs());
+    let steps = 8;
+    for i in 0..=steps {
+        let a = std::f32::consts::FRAC_PI_2 * i as f32 / steps as f32;
+        // От точки над углом (x, низ - ear) по дуге к точке на линии низа (x + ear, низ)
+        let pt = Pos2::new(center.x - ear * a.cos(), center.y + ear.abs() * a.sin());
+        mesh.colored_vertex(pt, color);
+    }
+    for i in 1..=steps as u32 {
+        mesh.add_triangle(0, i, i + 1);
+    }
+    egui::Shape::mesh(mesh)
 }
