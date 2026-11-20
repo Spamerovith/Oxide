@@ -113,6 +113,13 @@ pub enum PaneMode {
     Preview,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DropHow {
+    Copy,
+    Move,
+    Link,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Cmd {
     Open,
@@ -167,6 +174,10 @@ pub enum Cmd {
     HistoryJump(isize),
     OpenParsing(String),
     CopyPathOf(PathBuf),
+    /// Меню после перетаскивания правой кнопкой: что сделать с файлами в папке dst
+    DropAs { src: Vec<PathBuf>, dst: PathBuf, how: DropHow },
+    /// Пункт «Отмена»: просто закрыть меню
+    Nothing,
     PropertiesOf(PathBuf),
     OpenInNewTabPath(PathBuf),
     OpenInNewWindowPath(PathBuf),

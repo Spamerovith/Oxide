@@ -25,17 +25,19 @@ pub struct MenuItem {
     pub check: u8,
     pub sub: Vec<MenuItem>,
     pub sep: bool,
+    /// Действие по умолчанию - полужирным, как в Проводнике
+    pub bold: bool,
 }
 
 impl MenuItem {
     pub fn new(label: impl Into<String>, cmd: Cmd) -> Self {
-        MenuItem { cmd: Some(cmd), label: label.into(), icon: MIcon::None, shortcut: String::new(), enabled: true, check: 0, sub: vec![], sep: false }
+        MenuItem { cmd: Some(cmd), label: label.into(), icon: MIcon::None, shortcut: String::new(), enabled: true, check: 0, sub: vec![], sep: false, bold: false }
     }
     pub fn submenu(label: impl Into<String>, sub: Vec<MenuItem>) -> Self {
-        MenuItem { cmd: None, label: label.into(), icon: MIcon::None, shortcut: String::new(), enabled: true, check: 0, sub, sep: false }
+        MenuItem { cmd: None, label: label.into(), icon: MIcon::None, shortcut: String::new(), enabled: true, check: 0, sub, sep: false, bold: false }
     }
     pub fn sep() -> Self {
-        MenuItem { cmd: None, label: String::new(), icon: MIcon::None, shortcut: String::new(), enabled: false, check: 0, sub: vec![], sep: true }
+        MenuItem { cmd: None, label: String::new(), icon: MIcon::None, shortcut: String::new(), enabled: false, check: 0, sub: vec![], sep: true, bold: false }
     }
     pub fn icon(mut self, c: char) -> Self {
         self.icon = MIcon::Glyph(c, None);
@@ -59,6 +61,10 @@ impl MenuItem {
     }
     pub fn checked(mut self, b: bool) -> Self {
         self.check = if b { 1 } else { 3 };
+        self
+    }
+    pub fn bold(mut self) -> Self {
+        self.bold = true;
         self
     }
     pub fn radio(mut self, b: bool) -> Self {
@@ -143,7 +149,7 @@ fn measure(ctx: &egui::Context, items: &[MenuItem], min_w: f32) -> (f32, f32, bo
             if it.sep {
                 continue;
             }
-            let lw = f.layout_no_wrap(it.label.clone(), font(14.0), Color32::WHITE).size().x;
+            let lw = f.layout_no_wrap(it.label.clone(), if it.bold { font_sb(14.0) } else { font(14.0) }, Color32::WHITE).size().x;
             let sw = if it.shortcut.is_empty() { 0.0 } else { f.layout_no_wrap(it.shortcut.clone(), font(12.0), Color32::WHITE).size().x + 32.0 };
             let left = if has_icon { 44.0 } else { 16.0 };
             let right = if !it.sub.is_empty() { 36.0 } else { 16.0 };
@@ -308,7 +314,7 @@ pub fn show(ctx: &egui::Context, pop: &mut Popup, pal: &Palette, icons: &mut cra
                 ui.painter().circle_filled(Pos2::new(ix, cy), 3.5, tc);
             }
             let tx = if has_icon { r.left() + 40.0 } else { r.left() + 12.0 };
-            ui.painter().text(Pos2::new(tx, cy), Align2::LEFT_CENTER, &it.label, font(14.0), tc);
+            ui.painter().text(Pos2::new(tx, cy), Align2::LEFT_CENTER, &it.label, if it.bold { font_sb(14.0) } else { font(14.0) }, tc);
             if !it.shortcut.is_empty() {
                 let rx = if it.sub.is_empty() { r.right() - 12.0 } else { r.right() - 32.0 };
                 ui.painter().text(Pos2::new(rx, cy), Align2::RIGHT_CENTER, &it.shortcut, font(12.0), pal.text3);
@@ -438,7 +444,7 @@ pub fn show(ctx: &egui::Context, pop: &mut Popup, pal: &Palette, icons: &mut cra
                     ui.painter().circle_filled(Pos2::new(ix, cy), 3.5, tc);
                 }
                 let tx = if s_icon { r.left() + 40.0 } else { r.left() + 12.0 };
-                ui.painter().text(Pos2::new(tx, cy), Align2::LEFT_CENTER, &it.label, font(14.0), tc);
+                ui.painter().text(Pos2::new(tx, cy), Align2::LEFT_CENTER, &it.label, if it.bold { font_sb(14.0) } else { font(14.0) }, tc);
                 if !it.shortcut.is_empty() {
                     ui.painter().text(Pos2::new(r.right() - 12.0, cy), Align2::RIGHT_CENTER, &it.shortcut, font(12.0), pal.text3);
                 }

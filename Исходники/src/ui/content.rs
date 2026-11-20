@@ -367,7 +367,8 @@ fn body(app: &mut OxideApp, ui: &mut Ui, lay: Lay, view: ViewMode) {
 
     let mut open_idx: Option<(usize, bool)> = None;
     let mut menu_at: Option<Pos2> = None;
-    let mut start_drag = false;
+    // Some(true) - тянут правой кнопкой
+    let mut start_drag: Option<bool> = None;
     let mut item_hovered = false;
     let rename_idx = app.tabs[a].rename.as_ref().map(|r| r.idx);
 
@@ -471,11 +472,12 @@ fn body(app: &mut OxideApp, ui: &mut Ui, lay: Lay, view: ViewMode) {
         if resp.secondary_clicked() {
             menu_at = Some(resp.interact_pointer_pos().unwrap_or(r.center()));
         }
-        if resp.drag_started_by(egui::PointerButton::Primary) && !app.tabs[a].is_virtual() && app.tabs[a].marquee.is_none() {
+        let right_drag = resp.drag_started_by(egui::PointerButton::Secondary);
+        if (resp.drag_started_by(egui::PointerButton::Primary) || right_drag) && !app.tabs[a].is_virtual() && app.tabs[a].marquee.is_none() {
             if !app.tabs[a].sel[ei] {
                 app.tabs[a].select_only(ei);
             }
-            start_drag = true;
+            start_drag = Some(right_drag);
         }
         if hovered && !e.is_dir {
             let tip_type = e.type_name.clone().unwrap_or_else(|| fs::type_name(&e.ext, e.is_dir));
@@ -562,8 +564,8 @@ fn body(app: &mut OxideApp, ui: &mut Ui, lay: Lay, view: ViewMode) {
         let p = app.item_menu(&ctx, pos);
         app.open_popup(p);
     }
-    if start_drag {
-        app.pending_drag = Some(app.tabs[a].selected_paths());
+    if let Some(right) = start_drag {
+        app.pending_drag = Some((app.tabs[a].selected_paths(), right));
     }
     if let Some((ei, new_tab)) = open_idx {
         app.open_entry(&ctx, ei, new_tab);

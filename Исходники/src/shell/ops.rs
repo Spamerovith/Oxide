@@ -283,3 +283,28 @@ pub fn extract_zip(zipf: &Path, dest: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dest).map_err(|e| e.to_string())?;
     a.extract(dest).map_err(|e| e.to_string())
 }
+
+/// «Создать ярлыки»: ярлык на каждый файл в папке dst («Имя - Ярлык.lnk», как в Проводнике)
+pub fn create_shortcuts(src: &[PathBuf], dst: &Path) -> Result<(), String> {
+    use windows::core::Interface;
+    use windows::Win32::System::Com::IPersistFile;
+    use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
+    for f in src {
+        let name = f.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| f.to_string_lossy().replace([':', '\\'], ""));
+        let base = format!("{name}{}", crate::i18n::l(" - Ярлык", " - Shortcut"));
+        let lnk = super::fs::unique_name(dst, &base, ".lnk");
+        unsafe {
+            let link: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_ALL).map_err(|e| e.message())?;
+            let target = wide_path(f);
+            link.SetPath(PCWSTR(target.as_ptr())).map_err(|e| e.message())?;
+            if let Some(dir) = f.parent() {
+                let d = wide_path(dir);
+                let _ = link.SetWorkingDirectory(PCWSTR(d.as_ptr()));
+            }
+            let pf: IPersistFile = link.cast().map_err(|e| e.message())?;
+            let out = wide_path(&lnk);
+            pf.Save(PCWSTR(out.as_ptr()), true).map_err(|e| e.message())?;
+        }
+    }
+    Ok(())
+}

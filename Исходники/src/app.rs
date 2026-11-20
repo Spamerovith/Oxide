@@ -315,7 +315,8 @@ pub struct OxideApp {
     pub cut_set: HashSet<PathBuf>,
     pub settings_dirty: Option<f64>,
     pub drop_targets: DropTargets,
-    pub pending_drag: Option<Vec<PathBuf>>,
+    /// Файлы, которые начали перетаскивать, и правой ли кнопкой
+    pub pending_drag: Option<(Vec<PathBuf>, bool)>,
     ignore_drops_until: f64,
     pub drag_hover: Option<PathBuf>,
     pub content_rect: Rect,
@@ -1282,6 +1283,16 @@ impl OxideApp {
                 clipboard::set_text(&s.join("\r\n"));
             }
             Cmd::CopyPathOf(p) => clipboard::set_text(&format!("\"{}\"", p.display())),
+            Cmd::Nothing => {}
+            Cmd::DropAs { src, dst, how } => match how {
+                crate::cmd::DropHow::Copy => self.ops.run(Op::Copy { src, dst }),
+                crate::cmd::DropHow::Move => self.ops.run(Op::Move { src, dst }),
+                crate::cmd::DropHow::Link => {
+                    if let Err(e) = crate::shell::ops::create_shortcuts(&src, &dst) {
+                        self.dialog = Some(Dialog::Message { title: tr("Не удалось выполнить операцию").into(), text: e });
+                    }
+                }
+            },
             Cmd::PinHome => {
                 let names = self.tab().selected_names();
                 let names = if names.is_empty() { self.tab().fs_dir().map(|p| vec![p.to_string_lossy().to_string()]).unwrap_or_default() } else { names };
@@ -1754,18 +1765,55 @@ impl OxideApp {
         }
     }
 
+    /// Меню после перетаскивания правой кнопкой. Жирным - что сделалось бы левой кнопкой
+    fn drop_menu(&mut self, ctx: &egui::Context, files: Vec<PathBuf>, target: PathBuf, pos: Pos2) {
+        use crate::cmd::DropHow;
+        let files: Vec<PathBuf> = files.into_iter().filter(|f| f != &target && !target.starts_with(f)).collect();
+        if files.is_empty() {
+            return;
+        }
+        let same_parent = files.iter().all(|f| f.parent() == Some(target.as_path()));
+        let same_vol = files.iter().all(|f| {
+            let a = f.to_string_lossy().chars().take(2).collect::<String>().to_lowercase();
+            let b = target.to_string_lossy().chars().take(2).collect::<String>().to_lowercase();
+            a == b
+        });
+        let mk = |label: &'static str, how: DropHow| MenuItem::new(tr(label), Cmd::DropAs { src: files.clone(), dst: target.clone(), how });
+        let mut copy = mk("Копировать", DropHow::Copy);
+        let mut mv = mk("Переместить", DropHow::Move);
+        if same_vol {
+            mv = mv.bold();
+        } else {
+            copy = copy.bold();
+        }
+        let mut items = vec![copy];
+        // В ту же папку перемещать некуда: только копия и ярлыки
+        if !same_parent {
+            items.push(mv);
+        }
+        items.push(mk("Создать ярлыки", DropHow::Link));
+        items.push(MenuItem::sep());
+        items.push(MenuItem::new(tr("Отмена"), Cmd::Nothing));
+        let id = self.new_popup_id();
+        self.open_popup(Popup::new(id, pos, items, now(ctx)));
+    }
+
     fn handle_drops(&mut self, ctx: &egui::Context) {
         let t_now = now(ctx);
         let ppp = ctx.pixels_per_point();
         // Наши файлы перетаскиваются наружу/внутрь (OLE). Выполняется в конце кадра
-        if let Some(paths) = self.pending_drag.take() {
+        if let Some((paths, right)) = self.pending_drag.take() {
             let _ = smenu::drag_out(&paths);
             self.ignore_drops_until = t_now + 1.5;
-            // Если отпустили над нашим окном - выполняем сами
+            // Если отпустили над нашим окном - выполняем сами. Правой кнопкой - сначала меню, как в Проводнике
             if let Some(p) = window::cursor_client_points(ppp) {
                 if ctx.screen_rect().contains(p) && self.over_own_window() {
                     if let Some(target) = self.drop_target_at(p) {
-                        self.drop_files(paths, target);
+                        if right {
+                            self.drop_menu(ctx, paths, target, p);
+                        } else {
+                            self.drop_files(paths, target);
+                        }
                     }
                 }
             }
