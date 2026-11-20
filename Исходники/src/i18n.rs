@@ -317,6 +317,9 @@ const EN: &[(&str, &str)] = &[
     ("Вы действительно хотите безвозвратно удалить файл «{}»?", "Are you sure you want to permanently delete the file \"{}\"?"),
     ("Вы действительно хотите безвозвратно удалить эти элементы ({})?", "Are you sure you want to permanently delete these {} items?"),
     ("Вы действительно хотите безвозвратно удалить все элементы из корзины ({})?", "Are you sure you want to permanently delete all {} items in the Recycle Bin?"),
+    ("Дата удаления:", "Date deleted:"),
+    ("Исходное расположение:", "Original location:"),
+    ("Не удалось удалить элементы из корзины", "Couldn't delete the items from the Recycle Bin"),
     ("Да", "Yes"),
     ("Нет", "No"),
     // Свойства

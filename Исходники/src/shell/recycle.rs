@@ -81,7 +81,9 @@ unsafe fn invoke(cm: &IContextMenu, verb: &str, no_ui: bool) -> bool {
     let info = CMINVOKECOMMANDINFOEX {
         cbSize: std::mem::size_of::<CMINVOKECOMMANDINFOEX>() as u32,
         fMask: mask,
-        hwnd: super::window::hwnd(),
+        // Корзина спрашивает подтверждение, если ей дать окно, даже с CMIC_MASK_FLAG_NO_UI.
+        // Подтверждение уже спросил Oxide, поэтому без окна - иначе вопрос задаётся дважды
+        hwnd: if no_ui { Default::default() } else { super::window::hwnd() },
         lpVerb: PCSTR(a.as_ptr()),
         lpVerbW: PCWSTR(w.as_ptr()),
         nShow: SW_SHOWNORMAL.0,
@@ -104,26 +106,109 @@ fn run(paths: &[PathBuf], verb: &str, no_ui: bool) -> bool {
     }
 }
 
+/// Парный файл сведений `$I…` для файла `$R…`
+fn info_file(r: &Path) -> Option<PathBuf> {
+    let name = r.file_name()?.to_string_lossy().to_string();
+    let rest = name.strip_prefix("$R").or_else(|| name.strip_prefix("$r"))?;
+    Some(r.with_file_name(format!("$I{rest}")))
+}
+
+/// Убирает `$I…`, у которых больше нет `$R…`: элемента в корзине уже нет, а сведения
+/// о нём оболочка иногда оставляет. Возвращает, все ли элементы ушли из корзины
+fn tidy_now(paths: &[PathBuf]) -> bool {
+    let mut all_gone = true;
+    for r in paths {
+        if r.exists() {
+            all_gone = false;
+            continue;
+        }
+        if let Some(i) = info_file(r) {
+            let _ = std::fs::remove_file(i);
+        }
+    }
+    all_gone
+}
+
+/// То же в фоне: восстановление оболочка может заканчивать не сразу
+fn tidy_later(paths: Vec<PathBuf>) {
+    std::thread::Builder::new()
+        .name("bin-tidy".into())
+        .spawn(move || {
+            for _ in 0..30 {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                if tidy_now(&paths) {
+                    break;
+                }
+            }
+        })
+        .ok();
+}
+
 /// «Восстановить»: вернуть элементы туда, откуда их удалили
 pub fn restore(paths: &[PathBuf]) -> bool {
-    run(paths, "undelete", false)
+    let ok = run(paths, "undelete", false);
+    tidy_later(paths.to_vec());
+    ok
 }
 
 /// «Восстановить все объекты»
 pub fn restore_all() -> bool {
     let all = items();
     let sel: Vec<&Item> = all.iter().collect();
-    unsafe {
+    let ok = unsafe {
         match menu_of(&sel) {
             Some(cm) => invoke(&cm, "undelete", false),
             None => false,
         }
+    };
+    tidy_later(all.iter().map(|i| i.path.clone()).collect());
+    ok
+}
+
+/// Удалить навсегда. Подтверждение уже спросил Oxide: глагол «delete» корзины спрашивает
+/// ещё раз в любом случае, поэтому удаляем через IFileOperation без вопросов (прогресс Windows остаётся)
+pub fn delete_forever_sync(paths: &[PathBuf]) -> bool {
+    use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL};
+    use windows::Win32::UI::Shell::{FileOperation, IFileOperation, FILEOPERATION_FLAGS};
+    const FOF_NOCONFIRMATION: u32 = 0x0010;
+    const FOF_NOCONFIRMMKDIR: u32 = 0x0200;
+    const FOFX_SHOWELEVATIONPROMPT: u32 = 0x0004_0000;
+    let all = items();
+    let sel: Vec<&Item> = all.iter().filter(|i| paths.iter().any(|p| same(p, &i.path))).collect();
+    if sel.is_empty() {
+        return false;
+    }
+    unsafe {
+        let raw: Vec<*const ITEMIDLIST> = sel.iter().map(|i| i.pidl.0 as *const _).collect();
+        let Ok(arr) = SHCreateShellItemArrayFromIDLists(&raw) else { return false };
+        let Ok(fo) = CoCreateInstance::<_, IFileOperation>(&FileOperation, None, CLSCTX_ALL) else { return false };
+        let owner = super::window::hwnd();
+        if owner != Default::default() {
+            let _ = fo.SetOwnerWindow(owner);
+        }
+        if fo.SetOperationFlags(FILEOPERATION_FLAGS(FOF_NOCONFIRMATION | FOF_NOCONFIRMMKDIR | FOFX_SHOWELEVATIONPROMPT)).is_err() {
+            return false;
+        }
+        if fo.DeleteItems(&arr).is_err() {
+            return false;
+        }
+        let ok = fo.PerformOperations().is_ok();
+        tidy_now(&sel.iter().map(|i| i.path.clone()).collect::<Vec<_>>());
+        ok
     }
 }
 
-/// Удалить навсегда. Подтверждение уже спросил Oxide, поэтому без второго окна
-pub fn delete_forever(paths: &[PathBuf]) -> bool {
-    run(paths, "delete", true)
+/// То же в отдельном потоке, чтобы окно не замирало на больших папках
+pub fn delete_forever(paths: Vec<PathBuf>, done: impl FnOnce(bool) + Send + 'static) {
+    std::thread::Builder::new()
+        .name("bin-delete".into())
+        .spawn(move || {
+            unsafe {
+                let _ = windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_APARTMENTTHREADED);
+            }
+            done(delete_forever_sync(&paths));
+        })
+        .ok();
 }
 
 /// Свойства удалённых элементов (исходное расположение, дата удаления)
@@ -168,9 +253,7 @@ pub fn empty_now() {
 
 /// Откуда удалён элемент и когда: читается из парного файла `$I…`
 fn origin_of(r: &Path) -> Option<(PathBuf, u64)> {
-    let name = r.file_name()?.to_string_lossy().to_string();
-    let rest = name.strip_prefix("$R").or_else(|| name.strip_prefix("$r"))?;
-    let b = std::fs::read(r.with_file_name(format!("$I{rest}"))).ok()?;
+    let b = std::fs::read(info_file(r)?).ok()?;
     if b.len() < 28 {
         return None;
     }
@@ -209,12 +292,14 @@ pub fn restore_originals(originals: &[PathBuf]) -> bool {
         return false;
     }
     let sel: Vec<&Item> = pick.iter().map(|(i, _)| &all[*i]).collect();
-    unsafe {
+    let ok = unsafe {
         match menu_of(&sel) {
             Some(cm) => invoke(&cm, "undelete", false),
             None => false,
         }
-    }
+    };
+    tidy_later(sel.iter().map(|i| i.path.clone()).collect());
+    ok
 }
 
 #[cfg(test)]
@@ -258,7 +343,7 @@ mod tests {
         // Удаление навсегда без второго окна
         recycle(&f);
         let r = find(&f).expect("элемент в корзине");
-        assert!(delete_forever(&[r.clone()]));
+        assert!(delete_forever_sync(&[r.clone()]));
         let mut gone = false;
         for _ in 0..50 {
             if find(&f).is_none() {
@@ -269,6 +354,20 @@ mod tests {
         }
         assert!(gone, "удалён из корзины");
         assert!(!r.exists());
+        // Сведений `$I…` о тестовом файле в корзине не осталось
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        let bin_dir = r.parent().unwrap().to_path_buf();
+        let left = std::fs::read_dir(&bin_dir)
+            .unwrap()
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().starts_with("$I"))
+            .filter(|e| {
+                let b = std::fs::read(e.path()).unwrap_or_default();
+                let u: Vec<u16> = b.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+                String::from_utf16_lossy(&u).contains("oxide-bin-test")
+            })
+            .count();
+        assert_eq!(left, 0, "остались $I");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

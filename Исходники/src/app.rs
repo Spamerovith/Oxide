@@ -1211,11 +1211,26 @@ impl OxideApp {
             }
             let (title, text) = if ents.len() == 1 {
                 let e = &ents[0];
-                if e.is_dir {
+                let (title, mut text) = if e.is_dir {
                     (tr("Удаление папки").to_string(), trf("Вы действительно хотите безвозвратно удалить папку «{}»?", &[&e.display]))
                 } else {
                     (tr("Удаление файла").to_string(), trf("Вы действительно хотите безвозвратно удалить файл «{}»?", &[&e.display]))
+                };
+                // Сведения об элементе, как в окне Проводника
+                text.push('\n');
+                if let Some(t) = &e.type_name {
+                    text.push_str(&format!("\n{} {t}", tr("Тип:")));
                 }
+                if !e.is_dir {
+                    text.push_str(&format!("\n{} {}", tr("Размер:"), crate::util::format_bytes(e.size)));
+                }
+                if e.ctime != 0 {
+                    text.push_str(&format!("\n{} {}", tr("Дата удаления:"), crate::util::format_filetime(e.ctime)));
+                }
+                if let Some(l) = &e.location {
+                    text.push_str(&format!("\n{} {l}", tr("Исходное расположение:")));
+                }
+                (title, text)
             } else {
                 (tr("Удаление нескольких элементов").to_string(), trf("Вы действительно хотите безвозвратно удалить эти элементы ({})?", &[&ents.len()]))
             };
@@ -1591,11 +1606,15 @@ impl OxideApp {
                 }
             }
             Cmd::DeleteForeverNow(paths) => {
-                if recycle::delete_forever(&paths) {
-                    // Оболочка удаляет в фоне: список обновится, когда корзина изменится
-                    self.bin_check = 0.0;
-                    self.fs_dirty_all = true;
-                }
+                let tx = self.tx.clone();
+                let c = ctx.clone();
+                recycle::delete_forever(paths, move |ok| {
+                    if !ok {
+                        let _ = tx.send(Msg::Toast(tr("Не удалось удалить элементы из корзины").into()));
+                    }
+                    let _ = tx.send(Msg::RefreshAll);
+                    c.request_repaint();
+                });
             }
             Cmd::Navigate(p) => self.navigate(ctx, Location::Path(p)),
             Cmd::NavigateShell(s) => self.navigate(ctx, Location::Shell(s)),
