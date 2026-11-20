@@ -27,6 +27,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let has_sel = t.sel_count() > 0;
     let single = t.sel_count() == 1;
     let is_bin = matches!(&t.loc, Location::Shell(s) if s.eq_ignore_ascii_case(shellfolder::RECYCLE_BIN));
+    let bin_some = !t.entries.is_empty();
     let mut cmd: Option<Cmd> = None;
     let mut x = rect.left() + 12.0;
 
@@ -44,7 +45,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let paste_ok = writable && clipboard::has_files();
     let icons: [(char, Cmd, &str, bool); 6] = [
         (ICON_CUT, Cmd::Cut, tr("Вырезать (Ctrl+X)"), has_sel && listing),
-        (ICON_COPY, Cmd::Copy, tr("Копировать (Ctrl+C)"), has_sel && listing),
+        (ICON_COPY, Cmd::Copy, tr("Копировать (Ctrl+C)"), has_sel && listing && !is_bin),
         (ICON_PASTE, Cmd::Paste, tr("Вставить (Ctrl+V)"), paste_ok),
         (ICON_RENAME, Cmd::Rename, tr("Переименовать (F2)"), single && !virt),
         (ICON_SHARE, Cmd::Share, tr("Поделиться"), has_sel && !virt),
@@ -79,9 +80,16 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     if is_bin {
         vsep(ui.painter(), x, cy, 24.0, &pal);
         x += 12.0;
-        let (r, br) = cmd_button(ui, x, cy, Id::new("cb-emptybin"), Some((ICON_DELETE, pal.text)), tr("Очистить корзину"), false, &pal, true, false);
+        let some = bin_some;
+        let (r, br) = cmd_button(ui, x, cy, Id::new("cb-emptybin"), Some((ICON_DELETE, pal.text)), tr("Очистить корзину"), false, &pal, some, false);
         if r.clicked() {
             cmd = Some(Cmd::EmptyRecycleBin);
+        }
+        x = br.right() + 8.0;
+        let (label, c) = if has_sel { (tr("Восстановить выделенные объекты"), Cmd::RestoreSelected) } else { (tr("Восстановить все объекты"), Cmd::RestoreAll) };
+        let (r, br) = cmd_button(ui, x, cy, Id::new("cb-restorebin"), Some((ICON_RESTORE_BIN, pal.text)), label, false, &pal, some, false);
+        if r.clicked() {
+            cmd = Some(c);
         }
         x = br.right() + 12.0;
     }

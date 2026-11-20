@@ -77,6 +77,14 @@ pub fn enumerate(parsing: &str, show_ext: bool) -> Result<Vec<Entry>, String> {
                     e.name = fname;
                 }
             }
+            if is_bin {
+                // Оболочка отдаёт имя удалённого элемента вместе с исходной папкой, а Проводник
+                // в столбце «Имя» показывает только само имя (папка есть в «Исходном расположении»)
+                if let Some(short) = display.rsplit('\\').next().filter(|s| !s.is_empty()) {
+                    e.display = short.to_string();
+                    e.name = short.to_string();
+                }
+            }
             if let Ok(i2) = it.cast::<IShellItem2>() {
                 if let Ok(s) = i2.GetUInt64(&PKEY_SIZE) {
                     e.size = s;
@@ -204,12 +212,5 @@ pub fn shortcut_target(lnk: &std::path::Path) -> Option<PathBuf> {
         } else {
             Some(t)
         }
-    }
-}
-
-pub fn empty_recycle_bin() {
-    use windows::Win32::UI::Shell::SHEmptyRecycleBinW;
-    unsafe {
-        let _ = SHEmptyRecycleBinW(super::window::hwnd(), PCWSTR::null(), 0);
     }
 }

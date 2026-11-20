@@ -69,6 +69,7 @@ pub const ICON_INFO: char = '\u{E946}';
 pub const ICON_EXTRACT: char = '\u{E8DA}';
 pub const ICON_SHOW: char = '\u{E7B3}';
 pub const ICON_DOWNLOAD: char = '\u{E896}';
+pub const ICON_RESTORE_BIN: char = '\u{E777}';
 
 pub fn font(size: f32) -> FontId {
     FontId::new(size, FontFamily::Proportional)

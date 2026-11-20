@@ -279,6 +279,9 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
             Location::Shell(s) if s.eq_ignore_ascii_case(shellfolder::RECYCLE_BIN) => vec![
                 MenuItem::new(tr("Открыть"), Cmd::NavigateShell(s.clone())).icon(ICON_OPEN),
                 MenuItem::new(tr("Очистить корзину"), Cmd::EmptyRecycleBin).icon(ICON_DELETE),
+                MenuItem::new(tr("Восстановить все объекты"), Cmd::RestoreAll).icon(ICON_RESTORE_BIN),
+                MenuItem::sep(),
+                MenuItem::new(tr("Свойства"), Cmd::PropertiesOf(PathBuf::from(shellfolder::RECYCLE_BIN))).icon(ICON_PROPERTIES),
             ],
             Location::Home => vec![MenuItem::new(tr("Открыть в новой вкладке"), Cmd::NewTab).icon(ICON_ADD)],
             _ => vec![],

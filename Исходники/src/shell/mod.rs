@@ -5,6 +5,8 @@ pub mod default_app;
 pub mod fs;
 pub mod menu;
 pub mod ops;
+pub mod props;
+pub mod recycle;
 pub mod shellfolder;
 pub mod sysicons;
 pub mod window;

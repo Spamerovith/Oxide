@@ -161,6 +161,14 @@ pub enum Cmd {
     Options,
     SetWallpaper,
     EmptyRecycleBin,
+    /// Очистка корзины после подтверждения
+    EmptyRecycleBinNow,
+    /// «Восстановить» выделенные элементы корзины
+    RestoreSelected,
+    /// «Восстановить все объекты»
+    RestoreAll,
+    /// Удаление элементов корзины навсегда после подтверждения
+    DeleteForeverNow(Vec<PathBuf>),
     Navigate(PathBuf),
     NavigateShell(String),
     NavigateHome,

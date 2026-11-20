@@ -119,6 +119,49 @@ pub fn format_filetime(ft: u64) -> String {
     }
 }
 
+/// Полная дата со временем, как в свойствах файла («4 октября 2025 г., 19:14:24»)
+pub fn format_filetime_long(ft: u64) -> String {
+    use windows::Win32::Globalization::DATE_LONGDATE;
+    if ft == 0 {
+        return String::new();
+    }
+    unsafe {
+        let f = FILETIME { dwLowDateTime: ft as u32, dwHighDateTime: (ft >> 32) as u32 };
+        let mut utc = SYSTEMTIME::default();
+        if FileTimeToSystemTime(&f, &mut utc).is_err() {
+            return String::new();
+        }
+        let mut local = SYSTEMTIME::default();
+        if SystemTimeToTzSpecificLocalTime(None, &utc, &mut local).is_err() {
+            local = utc;
+        }
+        let mut d = [0u16; 96];
+        let mut t = [0u16; 64];
+        let dn = GetDateFormatEx(PCWSTR::null(), DATE_LONGDATE, Some(&local), PCWSTR::null(), Some(&mut d), PCWSTR::null());
+        let tn = GetTimeFormatEx(PCWSTR::null(), Default::default(), Some(&local), PCWSTR::null(), Some(&mut t));
+        let mut s = from_wide(&d[..dn.max(0) as usize]);
+        if tn > 0 {
+            s.push_str(", ");
+            s.push_str(&from_wide(&t[..tn as usize]));
+        }
+        s
+    }
+}
+
+/// Число с разделением разрядов по правилам языка интерфейса («17 903 871 773» / «17,903,871,773»)
+pub fn group_digits(n: u64) -> String {
+    let sep = if crate::i18n::is_en() { ',' } else { '\u{00A0}' };
+    let s = n.to_string();
+    let mut out = String::with_capacity(s.len() + s.len() / 3);
+    for (i, c) in s.chars().enumerate() {
+        if i > 0 && (s.len() - i) % 3 == 0 {
+            out.push(sep);
+        }
+        out.push(c);
+    }
+    out
+}
+
 /// Размер в КБ, как в столбце «Размер» Проводника («1 234 КБ»)
 pub fn format_kb(size: u64) -> String {
     let mut buf = [0u16; 64];

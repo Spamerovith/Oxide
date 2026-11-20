@@ -18,7 +18,7 @@ use crate::shell::fs::{self, Drive, Entry, ListOptions};
 use crate::shell::ops::{NewItem, Op, Ops};
 use crate::shell::shellfolder;
 use crate::shell::sysicons::IconCache;
-use crate::shell::{clipboard, menu as smenu, window};
+use crate::shell::{clipboard, menu as smenu, recycle, window};
 use crate::theme::{self, Palette, ThemeChoice};
 use crate::ui;
 use crate::ui::menu::{MenuItem, Popup, PopupResult, TopButton};
@@ -190,6 +190,9 @@ impl Tab {
         self.focus = self.order.iter().position(|&i| i == entry_idx);
         self.anchor = self.focus;
     }
+    pub fn is_bin(&self) -> bool {
+        matches!(&self.loc, Location::Shell(s) if s.eq_ignore_ascii_case(shellfolder::RECYCLE_BIN))
+    }
     pub fn is_virtual(&self) -> bool {
         matches!(self.loc, Location::Shell(_))
     }
@@ -216,26 +219,33 @@ impl Tab {
         let desc = self.view.desc;
         let e = &self.entries;
         let mut order: Vec<usize> = (0..e.len()).collect();
+        // Как в Проводнике: папки всегда выше файлов, в любом столбце и в обе стороны,
+        // Направление меняет только порядок внутри папок и внутри файлов
+        let folders_first = !matches!(col, SortCol::Location | SortCol::Extra);
         order.sort_by(|&a, &b| {
             let (x, y) = (&e[a], &e[b]);
-            let dirs = y.is_dir.cmp(&x.is_dir);
+            if folders_first && x.is_dir != y.is_dir {
+                return y.is_dir.cmp(&x.is_dir);
+            }
             let o = match col {
-                SortCol::Name => dirs.then_with(|| crate::util::natural_cmp(&x.display, &y.display)),
-                SortCol::Modified => dirs.then_with(|| x.mtime.cmp(&y.mtime)),
-                SortCol::Type => dirs.then_with(|| {
+                SortCol::Name => crate::util::natural_cmp(&x.display, &y.display),
+                SortCol::Modified => x.mtime.cmp(&y.mtime),
+                SortCol::Type => {
                     let tx = x.type_name.clone().unwrap_or_else(|| fs::type_name(&x.ext, x.is_dir));
                     let ty = y.type_name.clone().unwrap_or_else(|| fs::type_name(&y.ext, y.is_dir));
                     crate::util::natural_cmp(&tx, &ty)
-                }),
-                SortCol::Size => dirs.then_with(|| x.size.cmp(&y.size)),
+                }
+                SortCol::Size => x.size.cmp(&y.size),
                 SortCol::Location => crate::util::natural_cmp(x.location.as_deref().unwrap_or(""), y.location.as_deref().unwrap_or("")),
                 SortCol::Extra => x.ctime.cmp(&y.ctime),
             };
-            o.then_with(|| crate::util::natural_cmp(&x.display, &y.display))
+            let o = o.then_with(|| crate::util::natural_cmp(&x.display, &y.display));
+            if desc {
+                o.reverse()
+            } else {
+                o
+            }
         });
-        if desc {
-            order.reverse();
-        }
         let focused = self.focus.and_then(|f| self.order.get(f).copied());
         self.order = order;
         self.focus = focused.and_then(|fi| self.order.iter().position(|&i| i == fi));
@@ -263,12 +273,18 @@ pub enum Dialog {
     Language,
     /// Предложение установить новую версию
     Update(crate::update::Release),
+    /// Вопрос «Да / Нет», как в Проводнике. «Да» выполняет команду
+    Confirm { title: String, text: String, cmd: Cmd },
+    /// Окно «Свойства» Oxide
+    Properties(Box<crate::ui::props::Props>),
 }
 
 pub enum UndoRec {
     Rename { from: PathBuf, to: PathBuf },
     Move { items: Vec<(PathBuf, PathBuf)> },
     Created { paths: Vec<PathBuf> },
+    /// Удалённые в корзину: отмена восстанавливает их
+    Recycled { paths: Vec<PathBuf> },
 }
 
 #[derive(Default, Clone)]
@@ -300,6 +316,9 @@ pub struct OxideApp {
     pub drives: Vec<Drive>,
     drive_mask: u32,
     drive_check: f64,
+    /// Число и объём элементов корзины при последней проверке: открытая корзина обновляется сама
+    bin_seen: (u64, u64),
+    bin_check: f64,
     pub quick: Vec<(String, PathBuf, bool)>,
     pub recent: Vec<Entry>,
     pub nav: NavState,
@@ -380,6 +399,8 @@ impl OxideApp {
             drives: vec![],
             drive_mask: 0,
             drive_check: 0.0,
+            bin_seen: (u64::MAX, 0),
+            bin_check: 0.0,
             quick: vec![],
             recent: vec![],
             nav: NavState { expanded: settings.nav_expanded.iter().cloned().collect(), children: HashMap::new() },
@@ -882,6 +903,20 @@ impl OxideApp {
             }
         }
         self.fs_dirty_all = false;
+        // Открытая корзина следит за изменениями сама: удаление в Проводнике или в другом окне сразу видно
+        if self.tabs.iter().any(|t| t.is_bin()) && t_now - self.bin_check > 1.0 {
+            self.bin_check = t_now;
+            let info = recycle::info();
+            if info != self.bin_seen {
+                if self.bin_seen.0 != u64::MAX {
+                    for t in self.tabs.iter_mut().filter(|t| t.is_bin()) {
+                        t.dirty_at = Some(t_now - 1.0);
+                    }
+                }
+                self.bin_seen = info;
+            }
+            ctx.request_repaint_after(std::time::Duration::from_secs(1));
+        }
         // Подключение/отключение дисков
         if t_now - self.drive_check > 2.0 {
             self.drive_check = t_now;
@@ -921,6 +956,7 @@ impl OxideApp {
                             self.undo.push(UndoRec::Created { paths: created });
                         }
                     }
+                    Op::Delete { paths, permanent: false } => self.undo.push(UndoRec::Recycled { paths: paths.clone() }),
                     Op::Delete { .. } => {}
                 }
             }
@@ -1035,6 +1071,11 @@ impl OxideApp {
 
     pub fn open_entry(&mut self, ctx: &egui::Context, idx: usize, new_tab: bool) {
         let e = self.tab().entries[idx].clone();
+        if self.tab().is_bin() {
+            // Удалённые элементы не открываются: Проводник показывает их свойства
+            recycle::properties(&[e.path]);
+            return;
+        }
         if e.is_dir {
             let loc = if let Some(sh) = &e.shell {
                 let p = Path::new(&e.path);
@@ -1146,8 +1187,42 @@ impl OxideApp {
         let _ = ctx;
     }
 
+    /// Своё окно «Свойства» для обычных файлов и папок. Диски и виртуальные папки
+    /// показывает Windows. Возвращает false, если окно не подходит
+    fn open_own_properties(&mut self, ctx: &egui::Context, paths: Vec<PathBuf>) -> bool {
+        let ok = !paths.is_empty()
+            && paths.iter().all(|p| {
+                let s = p.to_string_lossy();
+                p.is_absolute() && p.parent().is_some() && !s.starts_with(r"\\?\") && fs::exists(p)
+            });
+        if ok {
+            self.dialog = Some(Dialog::Properties(Box::new(crate::ui::props::Props::new(self, ctx, paths))));
+        }
+        ok
+    }
+
     pub fn delete_selection(&mut self, permanent: bool) {
         let t = self.tab();
+        if t.is_bin() {
+            // В корзине «Удалить» стирает навсегда, как в Проводнике
+            let ents: Vec<Entry> = t.selected_entries().into_iter().cloned().collect();
+            if ents.is_empty() {
+                return;
+            }
+            let (title, text) = if ents.len() == 1 {
+                let e = &ents[0];
+                if e.is_dir {
+                    (tr("Удаление папки").to_string(), trf("Вы действительно хотите безвозвратно удалить папку «{}»?", &[&e.display]))
+                } else {
+                    (tr("Удаление файла").to_string(), trf("Вы действительно хотите безвозвратно удалить файл «{}»?", &[&e.display]))
+                }
+            } else {
+                (tr("Удаление нескольких элементов").to_string(), trf("Вы действительно хотите безвозвратно удалить эти элементы ({})?", &[&ents.len()]))
+            };
+            let paths = ents.into_iter().map(|e| e.path).collect();
+            self.dialog = Some(Dialog::Confirm { title, text, cmd: Cmd::DeleteForeverNow(paths) });
+            return;
+        }
         if t.is_virtual() {
             let names = t.selected_names();
             if !names.is_empty() {
@@ -1203,6 +1278,13 @@ impl OxideApp {
             UndoRec::Created { paths } => {
                 self.ops.run(Op::Delete { paths, permanent: false });
             }
+            UndoRec::Recycled { paths } => {
+                if recycle::restore_originals(&paths) {
+                    self.fs_dirty_all = true;
+                } else {
+                    self.toast = Some((tr("Не удалось восстановить из корзины").into(), now(ctx)));
+                }
+            }
         }
     }
 
@@ -1235,6 +1317,13 @@ impl OxideApp {
             }
             Cmd::Cut | Cmd::Copy => {
                 let cut = cmd == Cmd::Cut;
+                if self.tab().is_bin() {
+                    // Из корзины можно только вырезать: вставка восстанавливает элемент в новое место
+                    if cut {
+                        recycle::cut(&self.tab().selected_paths());
+                    }
+                    return;
+                }
                 if self.tab().is_virtual() {
                     let names = self.tab().selected_names();
                     smenu::invoke_verb(&names, if cut { "cut" } else { "copy" });
@@ -1261,8 +1350,26 @@ impl OxideApp {
                     self.toast = Some((tr("Общий доступ для этих элементов недоступен").into(), now(ctx)));
                 }
             }
+            Cmd::Properties if self.tab().is_bin() => {
+                let paths = self.tab().selected_paths();
+                if paths.is_empty() {
+                    smenu::invoke_verb(&[shellfolder::RECYCLE_BIN.to_string()], "properties");
+                } else {
+                    recycle::properties(&paths);
+                }
+            }
             Cmd::Properties => {
                 let names = self.tab().selected_names();
+                let own: Vec<PathBuf> = if names.is_empty() {
+                    self.tab().fs_dir().into_iter().collect()
+                } else if self.tab().is_virtual() {
+                    vec![]
+                } else {
+                    self.tab().selected_paths()
+                };
+                if self.open_own_properties(ctx, own) {
+                    return;
+                }
                 if names.is_empty() {
                     match &self.tab().loc {
                         Location::Path(p) => smenu::properties(&[p.to_string_lossy().to_string()]),
@@ -1457,8 +1564,38 @@ impl OxideApp {
                 smenu::invoke_verb(&names, "setdesktopwallpaper");
             }
             Cmd::EmptyRecycleBin => {
-                shellfolder::empty_recycle_bin();
+                let (n, _) = recycle::info();
+                if n == 0 {
+                    self.toast = Some((tr("Корзина пуста").into(), now(ctx)));
+                } else {
+                    self.dialog = Some(Dialog::Confirm {
+                        title: tr("Удаление нескольких элементов").into(),
+                        text: trf("Вы действительно хотите безвозвратно удалить все элементы из корзины ({})?", &[&n]),
+                        cmd: Cmd::EmptyRecycleBinNow,
+                    });
+                }
+            }
+            Cmd::EmptyRecycleBinNow => {
+                recycle::empty_now();
                 self.fs_dirty_all = true;
+            }
+            Cmd::RestoreSelected => {
+                let paths = self.tab().selected_paths();
+                if !paths.is_empty() && recycle::restore(&paths) {
+                    self.fs_dirty_all = true;
+                }
+            }
+            Cmd::RestoreAll => {
+                if recycle::restore_all() {
+                    self.fs_dirty_all = true;
+                }
+            }
+            Cmd::DeleteForeverNow(paths) => {
+                if recycle::delete_forever(&paths) {
+                    // Оболочка удаляет в фоне: список обновится, когда корзина изменится
+                    self.bin_check = 0.0;
+                    self.fs_dirty_all = true;
+                }
             }
             Cmd::Navigate(p) => self.navigate(ctx, Location::Path(p)),
             Cmd::NavigateShell(s) => self.navigate(ctx, Location::Shell(s)),
@@ -1503,7 +1640,17 @@ impl OxideApp {
             Cmd::OpenParsing(s) => {
                 smenu::open(&s);
             }
-            Cmd::PropertiesOf(p) => smenu::properties(&[p.to_string_lossy().to_string()]),
+            Cmd::PropertiesOf(p) => {
+                let s = p.to_string_lossy().to_string();
+                if self.open_own_properties(ctx, vec![p.clone()]) {
+                    return;
+                }
+                if s.starts_with("::") {
+                    smenu::invoke_verb(&[s], "properties");
+                } else {
+                    smenu::properties(&[s]);
+                }
+            }
             Cmd::OpenInNewTabPath(p) => self.open_tab(ctx, Location::Path(p), false),
             Cmd::OpenInNewWindowPath(p) => crate::util::spawn_window(Some(&p.to_string_lossy())),
         }
@@ -1521,6 +1668,12 @@ impl OxideApp {
     pub fn show_system_menu(&mut self, ctx: &egui::Context, pos: Pos2, extended: bool) {
         let ppp = ctx.pixels_per_point();
         let screen = window::client_to_screen(pos, ppp);
+        if self.tab().is_bin() && self.tab().sel_count() > 0 {
+            if let smenu::MenuOutcome::Invoked(_) = recycle::show_menu(&self.tab().selected_paths(), screen, extended) {
+                self.fs_dirty_all = true;
+            }
+            return;
+        }
         let names = self.tab().selected_names();
         let folder = match &self.tab().loc {
             Location::Path(p) => Some(p.to_string_lossy().to_string()),
@@ -1619,8 +1772,9 @@ impl OxideApp {
             MenuItem::new(tr("Обратить выделение"), Cmd::InvertSelection).icon(ICON_SELECT_NONE).enabled(!t.entries.is_empty()),
             MenuItem::sep(),
         ];
-        if matches!(&t.loc, Location::Shell(s) if s.eq_ignore_ascii_case(shellfolder::RECYCLE_BIN)) {
-            v.push(MenuItem::new(tr("Очистить корзину"), Cmd::EmptyRecycleBin).icon(ICON_DELETE));
+        if t.is_bin() {
+            v.push(MenuItem::new(tr("Очистить корзину"), Cmd::EmptyRecycleBin).icon(ICON_DELETE).enabled(!t.entries.is_empty()));
+            v.push(MenuItem::new(tr("Восстановить все объекты"), Cmd::RestoreAll).icon(ICON_RESTORE_BIN).enabled(!t.entries.is_empty()));
         }
         v.push(MenuItem::new(tr("Открыть в Терминале"), Cmd::OpenTerminal).icon(ICON_TERMINAL).enabled(t.fs_dir().is_some()));
         v.push(MenuItem::new(tr("Свойства"), Cmd::Properties).icon(ICON_PROPERTIES).key("Alt+Enter"));
@@ -1637,6 +1791,21 @@ impl OxideApp {
         let single = ents.len() == 1;
         let all_dirs = ents.iter().all(|e| e.is_dir);
         let first = ents.first().cloned();
+        if t.is_bin() {
+            let items = vec![
+                MenuItem::new(tr("Восстановить"), Cmd::RestoreSelected).icon(ICON_RESTORE_BIN),
+                MenuItem::new(tr("Свойства"), Cmd::Properties).icon(ICON_PROPERTIES).key("Alt+Enter"),
+                MenuItem::sep(),
+                MenuItem::new(tr("Показать дополнительные параметры"), Cmd::MoreOptions).icon(ICON_MORE_OPTIONS).key("Shift+F10"),
+            ];
+            let top = vec![
+                TopButton { icon: ICON_CUT, cmd: Cmd::Cut, tip: tr("Вырезать (Ctrl+X)").into(), enabled: true },
+                TopButton { icon: ICON_DELETE, cmd: Cmd::Delete, tip: tr("Удалить (Delete)").into(), enabled: true },
+            ];
+            let id = self.new_popup_id();
+            self.last_menu_pos = Some(pos);
+            return Popup::new(id, pos, items, now(ctx)).with_top(top);
+        }
         let mut items = vec![];
         items.push(MenuItem::new(tr("Открыть"), Cmd::Open).icon(ICON_OPEN).key("Enter"));
         if all_dirs && !virt {
@@ -1710,9 +1879,11 @@ impl OxideApp {
             items.push(MenuItem::sep());
             items.push(MenuItem::new(tr("Открыть в Терминале"), Cmd::OpenTerminal).icon(ICON_TERMINAL));
         }
-        if matches!(&self.tab().loc, Location::Shell(s) if s.eq_ignore_ascii_case(shellfolder::RECYCLE_BIN)) {
+        if self.tab().is_bin() {
+            let some = !self.tab().entries.is_empty();
             items.push(MenuItem::sep());
-            items.push(MenuItem::new(tr("Очистить корзину"), Cmd::EmptyRecycleBin).icon(ICON_DELETE));
+            items.push(MenuItem::new(tr("Очистить корзину"), Cmd::EmptyRecycleBin).icon(ICON_DELETE).enabled(some));
+            items.push(MenuItem::new(tr("Восстановить все объекты"), Cmd::RestoreAll).icon(ICON_RESTORE_BIN).enabled(some));
         }
         items.push(MenuItem::new(tr("Свойства"), Cmd::Properties).icon(ICON_PROPERTIES).key("Alt+Enter"));
         items.push(MenuItem::sep());

@@ -9,6 +9,7 @@ pub mod keys;
 pub mod menu;
 pub mod nav;
 pub mod pane;
+pub mod props;
 pub mod status;
 pub mod titlebar;
 pub mod widgets;

@@ -80,6 +80,11 @@ unsafe fn item(p: &Path) -> Result<IShellItem, String> {
     SHCreateItemFromParsingName(PCWSTR(w.as_ptr()), None).map_err(|e| format!("{}: {}", p.display(), e.message()))
 }
 
+#[cfg(test)]
+pub unsafe fn perform_for_test(op: &mut Op) -> Result<bool, String> {
+    perform(op)
+}
+
 unsafe fn perform(op: &Op) -> Result<bool, String> {
     let fo: IFileOperation = CoCreateInstance(&FileOperation, None, CLSCTX_ALL).map_err(|e| e.message())?;
     let owner = super::window::hwnd();

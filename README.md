@@ -13,8 +13,10 @@
   эскизы изображений и видео
 - Контекстное меню в стиле Windows 11 и полное системное меню (Shift+F10)
 - Копирование, перемещение, удаление в Корзину выполняет сам Windows: родные окна прогресса и конфликтов
-- Мгновенный поиск по всем дискам: индекс хранится на диске и почти не занимает оперативную память
-- Главная, Этот компьютер, Галерея, Сеть, Корзина, ZIP-архивы как папки
+- Мгновенный поиск по всем дискам: индекс хранится на диске и почти не занимает оперативную память,
+  а при обновлении не строится с нуля: заново читаются только изменённые папки
+- «Свойства» сразу показывают размер папки и сколько в ней файлов и папок, остальные вкладки Windows на месте
+- Главная, Этот компьютер, Галерея, Сеть, Корзина (с восстановлением и удалением навсегда), ZIP-архивы как папки
 - Те же горячие клавиши, что в Проводнике
 - Семь тем: как в Windows, Windows 11 светлая и тёмная, Oxide, Графит, Северная ночь, Бумага
 - Русский и английский интерфейс: язык выбирается при первом запуске, поменять можно в параметрах
@@ -73,6 +75,8 @@ Russian: pick the language on first launch and change it later in Options. Oxide
 new versions and updates itself in place, keeping your settings, tabs, pinned folders and search index
 
 Oxide can also open folders instead of File Explorer, including "Show in folder" from browsers (Options, Default file manager)
+
+Properties show the size of a folder right away, and the Recycle Bin can restore items or delete them permanently
 
 Download `Oxide.exe` from [Releases](../../releases) and run it, no installation needed. Requires
 Windows 10 or 11 (x64)

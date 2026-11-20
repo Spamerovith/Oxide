@@ -142,6 +142,90 @@ pub fn for_each_child(dir: &Path, mut f: impl FnMut(&str, u32, u64, u64, u64)) -
     Ok(())
 }
 
+/// Одна запись папки с размером на диске
+pub struct FullEntry<'a> {
+    pub name: &'a str,
+    pub attrs: u32,
+    pub size: u64,
+    pub alloc: u64,
+    pub mtime: u64,
+}
+
+/// Перебирает папку крупными пачками вместе с размером на диске (GetFileInformationByHandleEx):
+/// он нужен индексу и подсчёту размера папки: FindFirstFile не знает, сколько файл занимает на диске
+pub fn for_each_child_full(dir: &Path, mut f: impl FnMut(&FullEntry)) -> Result<(), u32> {
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::Storage::FileSystem::{
+        CreateFileW, FileFullDirectoryInfo, GetFileInformationByHandleEx, FILE_FLAG_BACKUP_SEMANTICS, FILE_FULL_DIR_INFO,
+        FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
+    };
+    const FILE_LIST_DIRECTORY: u32 = 1;
+    let w = wide_path(&long_path(dir));
+    unsafe {
+        let h = match CreateFileW(
+            PCWSTR(w.as_ptr()),
+            FILE_LIST_DIRECTORY,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            None,
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS,
+            None,
+        ) {
+            Ok(h) => h,
+            Err(e) => return Err(e.code().0 as u32 & 0xFFFF),
+        };
+        let mut buf = vec![0u64; 8192];
+        let bytes = (buf.len() * 8) as u32;
+        let mut name_buf = String::new();
+        let mut res = Ok(());
+        loop {
+            if let Err(e) = GetFileInformationByHandleEx(h, FileFullDirectoryInfo, buf.as_mut_ptr() as *mut _, bytes) {
+                let code = e.code().0 as u32 & 0xFFFF;
+                if code != ERROR_NO_MORE_FILES.0 && code != ERROR_FILE_NOT_FOUND.0 {
+                    res = Err(code);
+                }
+                break;
+            }
+            let base = buf.as_ptr() as *const u8;
+            let mut off = 0usize;
+            loop {
+                let info = &*(base.add(off) as *const FILE_FULL_DIR_INFO);
+                let len = info.FileNameLength as usize / 2;
+                let name = std::slice::from_raw_parts(info.FileName.as_ptr(), len);
+                name_buf.clear();
+                name_buf.extend(char::decode_utf16(name.iter().copied()).map(|c| c.unwrap_or('\u{FFFD}')));
+                if name_buf != "." && name_buf != ".." {
+                    f(&FullEntry {
+                        name: &name_buf,
+                        attrs: info.FileAttributes,
+                        size: info.EndOfFile.max(0) as u64,
+                        // Крошечные файлы NTFS хранит прямо в своей таблице (MFT): Проводник считает,
+                        // что на диске они не занимают ничего. Такой размер не кратен сектору
+                        alloc: if info.AllocationSize % 512 != 0 { 0 } else { info.AllocationSize.max(0) as u64 },
+                        mtime: info.LastWriteTime.max(0) as u64,
+                    });
+                }
+                if info.NextEntryOffset == 0 {
+                    break;
+                }
+                off += info.NextEntryOffset as usize;
+            }
+        }
+        let _ = CloseHandle(h);
+        res
+    }
+}
+
+/// Время изменения папки: меняется, когда в ней создают, удаляют или переименовывают элементы
+pub fn dir_mtime(p: &Path) -> Option<u64> {
+    let w = wide_path(&long_path(p));
+    let mut d = WIN32_FILE_ATTRIBUTE_DATA::default();
+    unsafe {
+        GetFileAttributesExW(PCWSTR(w.as_ptr()), GetFileExInfoStandard, &mut d as *mut _ as *mut _).ok()?;
+    }
+    Some(ft(&d.ftLastWriteTime))
+}
+
 pub fn error_text(code: u32) -> String {
     if code == ERROR_ACCESS_DENIED.0 {
         tr("Отказано в доступе").into()

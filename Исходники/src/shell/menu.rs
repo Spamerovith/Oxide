@@ -21,7 +21,7 @@ use crate::util::{wide, wide_path};
 const CMIC_MASK_UNICODE: u32 = 0x4000;
 use windows::core::PSTR;
 
-pub struct Pidl(*mut ITEMIDLIST);
+pub struct Pidl(pub *mut ITEMIDLIST);
 impl Drop for Pidl {
     fn drop(&mut self) {
         unsafe { CoTaskMemFree(Some(self.0 as *const _)) }
@@ -84,6 +84,14 @@ pub fn show_shell_menu(names: &[String], folder: Option<&str>, screen: (i32, i32
             items_menu(names)
         };
         let Some(cm) = cm else { return MenuOutcome::None };
+        track_menu(&cm, names, folder, screen, extended)
+    }
+}
+
+/// Показывает готовое меню оболочки и выполняет выбранную команду
+pub fn track_menu(cm: &IContextMenu, names: &[String], folder: Option<&str>, screen: (i32, i32), extended: bool) -> MenuOutcome {
+    unsafe {
+        let hwnd = super::window::hwnd();
         let Ok(menu) = CreatePopupMenu() else { return MenuOutcome::None };
         let mut flags = CMF_NORMAL | CMF_EXPLORE;
         if extended {
@@ -107,7 +115,7 @@ pub fn show_shell_menu(names: &[String], folder: Option<&str>, screen: (i32, i32
             } else if (verb == "open" || verb == "explore") && names.len() == 1 && super::fs::is_dir(Path::new(&names[0])) {
                 outcome = MenuOutcome::Open;
             } else {
-                invoke_id(&cm, id, folder, screen);
+                invoke_id(cm, id, folder, screen);
                 outcome = MenuOutcome::Invoked(verb);
             }
         }

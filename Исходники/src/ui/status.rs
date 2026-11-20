@@ -48,7 +48,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     if app.engine.building.load(std::sync::atomic::Ordering::Relaxed) && !app.engine.ready() {
         let n = app.engine.progress.load(std::sync::atomic::Ordering::Relaxed);
         if n > 0 {
-            text.push_str(&trf("      Индексация для быстрого поиска: {}", &[&n]));
+            text.push_str(&trf("      Индексация для быстрого поиска: просмотрено папок {}", &[&n]));
             ctx.request_repaint_after(std::time::Duration::from_millis(500));
         }
     }

@@ -17,7 +17,7 @@ pub fn disclaimer() -> &'static str {
 }
 
 pub fn show(app: &mut OxideApp, ctx: &egui::Context) {
-    let Some(d) = app.dialog.take() else { return };
+    let Some(mut d) = app.dialog.take() else { return };
     let pal = app.pal.clone();
     let ctx = ctx.clone();
     let ctx = &ctx;
@@ -29,8 +29,14 @@ pub fn show(app: &mut OxideApp, ctx: &egui::Context) {
         .inner_margin(egui::Margin::same(24))
         .shadow(egui::Shadow { offset: [0, 16], blur: 32, spread: 0, color: pal.shadow });
     let mut keep = true;
+    let mut run: Option<crate::cmd::Cmd> = None;
     let modal = egui::Modal::new(Id::new("dialog")).frame(frame).backdrop_color(egui::Color32::from_black_alpha(if pal.dark { 110 } else { 70 }));
-    let resp = modal.show(ctx, |ui| match &d {
+    let resp = modal.show(ctx, |ui| {
+        if let Dialog::Properties(p) = &mut d {
+            super::props::ui(app, ui, p, &mut keep);
+            return;
+        }
+        match &d {
         Dialog::Settings => settings(app, ui, &mut keep),
         Dialog::Message { title, text } => {
             ui.set_width(420.0);
@@ -44,6 +50,25 @@ pub fn show(app: &mut OxideApp, ctx: &egui::Context) {
                 }
             });
         }
+        Dialog::Confirm { title, text, cmd } => {
+            ui.set_width(420.0);
+            ui.label(egui::RichText::new(title).font(font_sb(20.0)).color(pal.text));
+            ui.add_space(12.0);
+            ui.add(egui::Label::new(egui::RichText::new(text).font(font(14.0)).color(pal.text)).wrap());
+            ui.add_space(24.0);
+            let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if button(ui, tr("Нет"), false, &pal, 120.0).clicked() {
+                    keep = false;
+                }
+                ui.add_space(8.0);
+                if button(ui, tr("Да"), true, &pal, 120.0).clicked() || enter {
+                    run = Some(cmd.clone());
+                    keep = false;
+                }
+            });
+        }
+        Dialog::Properties(_) => {}
         Dialog::Language => {
             ui.set_width(420.0);
             ui.label(egui::RichText::new("Язык интерфейса / Language").font(font_sb(20.0)).color(pal.text));
@@ -122,6 +147,7 @@ You can change it later in Options").font(font(14.0)).color(pal.text2)).wrap());
                 });
             });
         }
+        }
     });
     // Язык нужно выбрать: Esc и щелчок мимо окна его не закрывают
     if resp.should_close() && !matches!(d, Dialog::Language) {
@@ -129,6 +155,9 @@ You can change it later in Options").font(font(14.0)).color(pal.text2)).wrap());
     }
     if keep {
         app.dialog = Some(d);
+    }
+    if let Some(c) = run {
+        app.exec(ctx, c);
     }
 }
 
@@ -251,7 +280,8 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
         let status = {
             let building = app.engine.building.load(std::sync::atomic::Ordering::Relaxed);
             let prog = app.engine.progress.load(std::sync::atomic::Ordering::Relaxed);
-            let info = app.engine.index.read().ok().and_then(|g| g.as_ref().map(|ix| (ix.len(), ix.disk_bytes(), ix.built)));
+            let total = app.engine.progress_total.load(std::sync::atomic::Ordering::Relaxed);
+            let info = app.engine.info();
             let mut t = match info {
                 Some((n, bytes, built)) => trf(
                     "В индексе {} объектов (на диске {}, обновлён {}). Индекс читается с диска по мере надобности и почти не занимает оперативную память",
@@ -260,7 +290,13 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
                 None => tr("Индекс ещё не построен: поиск идёт по папкам напрямую").into(),
             };
             if building {
-                t.push_str(&trf(" Обновление… обработано объектов: {}", &[&prog]));
+                if total > 0 {
+                    // Индекс не строится с нуля: проверяются только изменения
+                    t.push_str(&trf(" Проверка изменений: папок {} из {}", &[&prog.min(total), &total]));
+                } else {
+                    t.push_str(&trf(" Построение… просмотрено папок: {}", &[&prog]));
+                }
+                ctx.request_repaint_after(std::time::Duration::from_millis(500));
             }
             t
         };
@@ -270,7 +306,7 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
         }
         ui.add_space(4.0);
         if !app.engine.building.load(std::sync::atomic::Ordering::Relaxed) && app.settings.index_enabled && button(ui, tr("Перестроить индекс"), false, &pal, 160.0).clicked() {
-            app.engine.build(ctx.clone());
+            app.engine.build(ctx.clone(), true);
         }
         if changed || reload {
             app.mark_settings(&ctx);
