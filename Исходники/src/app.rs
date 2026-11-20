@@ -368,6 +368,7 @@ impl OxideApp {
         crate::fonts::install(&ctx);
         ctx.options_mut(|o| {
             o.zoom_with_keyboard = false;
+            o.line_scroll_speed = theme::wheel_step();
         });
         let system_dark = theme::system_is_dark();
         let accent = theme::system_accent_palette();
@@ -2092,6 +2093,8 @@ impl OxideApp {
         self.system_dark = theme::system_is_dark();
         self.accent = theme::system_accent_palette();
         self.animations = theme::system_animations_enabled();
+        let step = theme::wheel_step();
+        ctx.options_mut(|o| o.line_scroll_speed = step);
         self.pal = Palette::resolve(self.settings.theme, self.system_dark, self.accent).tune_glass(self.settings.glass_clarity, self.settings.glass_shine);
         let (blur, note) = glass_mode(&self.settings, self.gpu_alpha);
         self.glass_note = note;

@@ -22,6 +22,10 @@ pub static MAX_HOVER: AtomicBool = AtomicBool::new(false);
 pub static MAX_PRESSED: AtomicBool = AtomicBool::new(false);
 pub static PASTE_REQUEST: AtomicBool = AtomicBool::new(false);
 pub static THEME_CHANGED: AtomicBool = AtomicBool::new(false);
+/// Окно тащат за заголовок (или меняют размер): идёт системный цикл перемещения
+static IN_MOVE: AtomicBool = AtomicBool::new(false);
+/// За время перетаскивания окно сдвинулось: в конце сообщим новое положение один раз
+static MOVED: AtomicBool = AtomicBool::new(false);
 static CTX: OnceLock<egui::Context> = OnceLock::new();
 
 /// Области заголовка в физических пикселях клиентской области
@@ -207,6 +211,39 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) 
     }
 
     match msg {
+        WM_ENTERSIZEMOVE => {
+            IN_MOVE.store(true, Ordering::Relaxed);
+        }
+        WM_EXITSIZEMOVE => {
+            IN_MOVE.store(false, Ordering::Relaxed);
+            let r = call_old(hwnd, msg, wp, lp);
+            if MOVED.swap(false, Ordering::Relaxed) {
+                // Одно итоговое «окно сдвинулось», чтобы запомнить положение
+                let mut rc = RECT::default();
+                let _ = GetWindowRect(hwnd, &mut rc);
+                let mut wpos = WINDOWPOS {
+                    hwnd,
+                    hwndInsertAfter: HWND::default(),
+                    x: rc.left,
+                    y: rc.top,
+                    cx: rc.right - rc.left,
+                    cy: rc.bottom - rc.top,
+                    flags: SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSIZE,
+                };
+                call_old(hwnd, WM_WINDOWPOSCHANGED, WPARAM(0), LPARAM(&mut wpos as *mut _ as isize));
+                repaint();
+            }
+            return r;
+        }
+        // Пока окно тащат, не перерисовываем его на каждый сдвиг: содержимое не меняется, а ожидание
+        // кадра тормозило перемещение. Изменение размера проходит как обычно
+        WM_WINDOWPOSCHANGED if IN_MOVE.load(Ordering::Relaxed) => {
+            let wpos = &*(lp.0 as *const WINDOWPOS);
+            if wpos.flags.contains(SWP_NOSIZE) && !wpos.flags.contains(SWP_NOMOVE) {
+                MOVED.store(true, Ordering::Relaxed);
+                return DefWindowProcW(hwnd, msg, wp, lp);
+            }
+        }
         WM_NCCALCSIZE if wp.0 != 0 => {
             // Слева, справа и снизу рамка остаётся системной: она невидима и лежит за краем окна,
             // как у Проводника, поэтому не мешает брать полосу прокрутки. Убираем только заголовок

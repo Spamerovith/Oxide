@@ -588,3 +588,15 @@ pub fn system_transparency() -> bool {
     let saver = unsafe { windows::Win32::System::Power::GetSystemPowerStatus(&mut ps).is_ok() } && ps.SystemStatusFlag == 1;
     on && !saver
 }
+
+/// Сколько точек прокручивает один щелчок колёсика: как в Проводнике, число строк из параметров
+/// мыши Windows (обычно 3) на высоту строки. «На один экран» - примерно десять строк
+pub fn wheel_step() -> f32 {
+    use windows::Win32::UI::WindowsAndMessaging::{SystemParametersInfoW, SPI_GETWHEELSCROLLLINES, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS};
+    let mut lines: u32 = 3;
+    unsafe {
+        let _ = SystemParametersInfoW(SPI_GETWHEELSCROLLLINES, 0, Some(&mut lines as *mut u32 as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0));
+    }
+    let lines = if lines == u32::MAX { 10 } else { lines.clamp(1, 30) };
+    lines as f32 * 36.0
+}

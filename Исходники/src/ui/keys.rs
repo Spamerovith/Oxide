@@ -125,7 +125,12 @@ pub fn handle(app: &mut OxideApp, ctx: &egui::Context) {
     } else if copy {
         app.exec(ctx, Cmd::Copy);
     }
-    if cut {
+    // Shift+Del egui превращает в «Вырезать» (старое сочетание Windows), а в Проводнике это
+    // удаление без корзины. Ctrl+X при этом приходит без Shift
+    let shift_only = ctx.input(|i| i.modifiers.shift && !i.modifiers.ctrl && !i.modifiers.alt);
+    if cut && shift_only {
+        app.exec(ctx, Cmd::DeletePermanent);
+    } else if cut {
         app.exec(ctx, Cmd::Cut);
     }
     if window::PASTE_REQUEST.swap(false, Ordering::Relaxed) {
