@@ -24,7 +24,15 @@ use crate::util::{format_bytes, format_filetime_long, group_digits};
 const W: f32 = 520.0;
 const LABEL_W: f32 = 128.0;
 
+static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
 pub struct Props {
+    /// Своё окно Windows у каждого «Свойства», как в Проводнике
+    pub id: u64,
+    /// Высота содержимого с прошлого кадра: под неё подгоняется окно
+    height: f32,
+    /// Где открылось окно: чуть правее и ниже левого верхнего угла Oxide, как у Проводника
+    pos: Option<egui::Pos2>,
     items: Vec<ItemInfo>,
     name: String,
     orig_name: String,
@@ -91,6 +99,9 @@ impl Props {
             None
         };
         Props {
+            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+            height: 0.0,
+            pos: None,
             items,
             orig_name: name.clone(),
             name,
@@ -265,12 +276,6 @@ pub fn ui(app: &mut OxideApp, ui: &mut Ui, p: &mut Props, keep: &mut bool) {
     let pal = app.pal.clone();
     ui.set_width(W);
     let single = p.single().cloned();
-    let title = match &single {
-        Some(i) => i.path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| i.path.to_string_lossy().to_string()),
-        None => trf("Файлов: {}, папок: {}", &[&p.items.iter().filter(|i| !i.is_dir).count(), &p.items.iter().filter(|i| i.is_dir).count()]),
-    };
-    ui.label(egui::RichText::new(trf("Свойства: {}", &[&title])).font(font_sb(20.0)).color(pal.text));
-    ui.add_space(12.0);
 
     // Вкладки: «Общие» - наша, остальные открывают системное окно сразу на нужной вкладке
     let mut pages: Vec<(&str, &str, &str)> = vec![];
@@ -356,7 +361,8 @@ pub fn ui(app: &mut OxideApp, ui: &mut Ui, p: &mut Props, keep: &mut bool) {
                 out.response.request_focus();
             }
         } else {
-            ui.label(egui::RichText::new(&title).font(font(14.0)).color(pal.text));
+            let many = trf("Файлов: {}, папок: {}", &[&p.items.iter().filter(|i| !i.is_dir).count(), &p.items.iter().filter(|i| i.is_dir).count()]);
+            ui.label(egui::RichText::new(many).font(font(14.0)).color(pal.text));
         }
     });
     ui.add_space(12.0);
@@ -478,6 +484,9 @@ pub fn ui(app: &mut OxideApp, ui: &mut Ui, p: &mut Props, keep: &mut bool) {
     // ОК / Отмена / Применить
     let changed = p.changed();
     let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
+    if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+        *keep = false;
+    }
     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         let ap = ui.add_enabled_ui(changed, |ui| button(ui, tr("Применить"), false, &pal, 96.0)).inner;
         if ap.clicked() && changed {
@@ -495,4 +504,74 @@ pub fn ui(app: &mut OxideApp, ui: &mut Ui, p: &mut Props, keep: &mut bool) {
         }
     });
     let _ = l;
+}
+
+impl Props {
+    /// Заголовок окна: «Свойства: имя»
+    pub fn title(&self) -> String {
+        let name = match self.single() {
+            Some(i) => i.path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| i.path.to_string_lossy().to_string()),
+            None => trf("Файлов: {}, папок: {}", &[&self.items.iter().filter(|i| !i.is_dir).count(), &self.items.iter().filter(|i| i.is_dir).count()]),
+        };
+        trf("Свойства: {}", &[&name])
+    }
+}
+
+/// Окна «Свойства»: каждое - отдельное окно Windows со своей кнопкой на панели задач, как в Проводнике.
+/// Главное окно при этом остаётся доступным
+pub fn show_windows(app: &mut OxideApp, ctx: &egui::Context) {
+    if app.props_windows.is_empty() {
+        return;
+    }
+    let mut wins = std::mem::take(&mut app.props_windows);
+    // Отдельное окно не прозрачное: стекло в нём превращается в обычный фон
+    let main_pal = app.pal.clone();
+    let pal = main_pal.clone().solid();
+    app.pal = pal.clone();
+    static ICON: std::sync::OnceLock<Option<std::sync::Arc<egui::IconData>>> = std::sync::OnceLock::new();
+    let icon = ICON.get_or_init(|| eframe::icon_data::from_png_bytes(include_bytes!("../../assets/oxide.png")).ok().map(std::sync::Arc::new)).clone();
+    let main_rect = ctx.input(|i| i.viewport().outer_rect);
+    wins.retain_mut(|p| {
+        let mut keep = true;
+        if p.pos.is_none() {
+            p.pos = Some(main_rect.map(|r| r.min + egui::vec2(80.0, 60.0)).unwrap_or(egui::pos2(120.0, 120.0)));
+        }
+        let margin = 24.0;
+        let h = if p.height > 0.0 { p.height + margin * 2.0 } else { 560.0 };
+        let mut vb = egui::ViewportBuilder::default()
+            .with_title(p.title())
+            .with_inner_size([W + margin * 2.0, h])
+            .with_position(p.pos.unwrap_or_default())
+            .with_resizable(false)
+            .with_minimize_button(false)
+            .with_maximize_button(false);
+        if let Some(i) = &icon {
+            vb = vb.with_icon(i.clone());
+        }
+        let vid = egui::ViewportId::from_hash_of(("oxide-props", p.id));
+        ctx.show_viewport_immediate(vid, vb, |vctx, _| {
+            vctx.send_viewport_cmd(egui::ViewportCommand::SetTheme(if pal.dark { egui::SystemTheme::Dark } else { egui::SystemTheme::Light }));
+            egui::CentralPanel::default()
+                .frame(egui::Frame::NONE.fill(pal.flyout).inner_margin(egui::Margin::same(margin as i8)))
+                .show(vctx, |ui| {
+                    crate::theme::set_surface(pal.flyout);
+                    let top = ui.cursor().top();
+                    let id = p.id;
+                    ui.push_id(id, |ui| self::ui(app, ui, p, &mut keep));
+                    let used = ui.min_rect().bottom() - top;
+                    if (used - p.height).abs() > 1.0 {
+                        p.height = used;
+                        vctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(W + margin * 2.0, used + margin * 2.0)));
+                    }
+                });
+            if vctx.input(|i| i.viewport().close_requested()) {
+                keep = false;
+            }
+        });
+        keep
+    });
+    app.pal = main_pal;
+    // Пока окна были у нас, могли открыться новые
+    wins.append(&mut app.props_windows);
+    app.props_windows = wins;
 }

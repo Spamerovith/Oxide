@@ -274,9 +274,10 @@ impl Palette {
             p.layer = rgba(0x2A2F39A6);
             p.cmdbar = rgba(0x1E222A99);
             p.divider = rgba(0xFFFFFF1F);
-            p.field = rgba(0xFFFFFF1C);
-            p.field_hover = rgba(0xFFFFFF29);
-            p.field_stroke = rgba(0xFFFFFF33);
+            // Поля темнее фона: на светлых обоях белый текст остаётся читаемым и верх не слепит
+            p.field = rgba(0x0B0E1466);
+            p.field_hover = rgba(0x1A1F2873);
+            p.field_stroke = rgba(0xFFFFFF26);
             p.text = hex(0xFFFFFF);
             p.text2 = hex(0xDCE0E8);
             p.text3 = hex(0xA9AFBA);
@@ -329,14 +330,15 @@ impl Palette {
             return self;
         }
         let clarity = clarity.clamp(0.0, 1.0);
-        let base_a = 0.92 - 0.86 * clarity;
+        // Уже на середине ползунка стекло заметно прозрачное, на максимуме - почти чистое
+        let base_a = 0.04 + 0.6 * (1.0 - clarity).powf(1.3);
         let with_a = |c: Color32, a: f32| {
             let [r, g, b, _] = c.to_srgba_unmultiplied();
             Color32::from_rgba_unmultiplied(r, g, b, (a.clamp(0.0, 1.0) * 255.0).round() as u8)
         };
         self.base = with_a(self.base, base_a);
-        self.layer = with_a(self.layer, base_a + 0.12);
-        self.cmdbar = with_a(self.cmdbar, base_a + 0.06);
+        self.layer = with_a(self.layer, base_a + 0.10);
+        self.cmdbar = with_a(self.cmdbar, base_a + 0.05);
         self.shine = shine.clamp(0.0, 1.0);
         self
     }

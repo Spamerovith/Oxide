@@ -772,13 +772,24 @@ fn rename_editor(app: &mut OxideApp, ui: &mut Ui, rect: Rect, _view: ViewMode) {
     let Some(rn) = app.tabs[a].rename.as_mut() else { return };
     let id = Id::new(("rename", rn.idx));
     let mut text = rn.text.clone();
-    let rect = Rect::from_min_size(rect.min, Vec2::new(rect.width().max(160.0), 24.0));
-    ui.painter().rect_filled(rect, CornerRadius::same(m::R_CTRL), pal.field);
-    ui.painter().rect_stroke(rect, CornerRadius::same(m::R_CTRL), Stroke::new(1.0, pal.accent), StrokeKind::Inside);
-    let inner = rect.shrink2(Vec2::new(4.0, 2.0));
+    // Как в Проводнике: рамка по ширине имени и растёт при наборе, текст на месте подписи,
+    // выделение системным синим
+    let tw = text_width(ui, &text, font(12.0));
+    let w = (tw + 12.0).clamp(48.0, rect.width().max(48.0));
+    // Рамка на 1 правее начала подписи, текст внутри ровно на месте подписи
+    let rect = Rect::from_min_size(Pos2::new(rect.left() + 1.0, rect.center().y - 10.0), Vec2::new(w, 20.0)).round_ui();
+    let bg = if pal.dark { egui::Color32::BLACK } else { egui::Color32::WHITE };
+    ui.painter().rect_filled(rect, CornerRadius::ZERO, bg);
+    ui.painter().rect_stroke(rect, CornerRadius::ZERO, Stroke::new(1.0, pal.text3), StrokeKind::Inside);
+    let inner = rect.shrink2(Vec2::new(3.0, 2.0));
     let out = ui
         .scope_builder(egui::UiBuilder::new().max_rect(inner), |ui| {
-            TextEdit::singleline(&mut text).id(id).frame(false).font(font(12.0)).text_color(pal.text).desired_width(inner.width()).vertical_align(egui::Align::Center).show(ui)
+            // Высота поля - ровно строка: иначе выделение вылезает за рамку
+            ui.spacing_mut().interact_size.y = inner.height();
+            ui.set_clip_rect(inner.expand(1.0));
+            ui.visuals_mut().selection.bg_fill = pal.marquee;
+            ui.visuals_mut().selection.stroke = Stroke::new(1.0, egui::Color32::WHITE);
+            TextEdit::singleline(&mut text).id(id).frame(false).margin(egui::Margin::ZERO).font(font(12.0)).text_color(pal.text).desired_width(inner.width()).vertical_align(egui::Align::Center).show(ui)
         })
         .inner;
     if rn.init {

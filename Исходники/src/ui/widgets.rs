@@ -455,15 +455,15 @@ pub fn glass_rim(p: &Painter, r: Rect, radius: f32, pal: &Palette) {
             let hue = (n.y.atan2(n.x) / std::f32::consts::TAU + phase).rem_euclid(1.0);
             let rainbow: Color32 = egui::epaint::Hsva::new(hue, 0.6, 1.0, 1.0).into();
             // В центре блика свет белый, по краям - цветной перелив
-            let k = spec * 0.75;
+            let k = spec * 0.5;
             let mix = |v: u8| (v as f32 * (1.0 - k) + 255.0 * k).round() as u8;
-            let rest = if dark { 0.14 } else { 0.3 };
-            let a = (shine * strength * (rest + 0.86 * spec)).clamp(0.0, 1.0);
+            let rest = if dark { 0.08 } else { 0.2 };
+            let a = (shine * strength * (rest + 0.5 * spec)).clamp(0.0, 1.0);
             Color32::from_rgba_unmultiplied(mix(rainbow.r()), mix(rainbow.g()), mix(rainbow.b()), (a * 255.0) as u8)
         }) as std::sync::Arc<dyn Fn(Rect, Pos2) -> Color32 + Send + Sync>
     };
     // Тонкая яркая кромка и мягкое свечение внутри: стекло выглядит толстым
-    for (inset, width, strength) in [(0.6, 1.2, 1.0), (2.2, 3.0, 0.22)] {
+    for (inset, width, strength) in [(0.5, 1.0, 1.0), (2.0, 2.5, 0.12)] {
         let rr = r.shrink(inset);
         if rr.width() < 2.0 || rr.height() < 2.0 {
             continue;

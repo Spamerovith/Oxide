@@ -329,6 +329,8 @@ pub struct OxideApp {
     pub popup: Option<Popup>,
     pub popup_seq: u64,
     pub dialog: Option<Dialog>,
+    /// Открытые окна «Свойства»
+    pub props_windows: Vec<Box<crate::ui::props::Props>>,
     pub toast: Option<(String, f64)>,
     pub undo: Vec<UndoRec>,
     pub new_items: Option<Vec<NewItem>>,
@@ -375,6 +377,9 @@ impl OxideApp {
                 if let RawWindowHandle::Win32(w) = h.as_raw() {
                     let hwnd = windows::Win32::Foundation::HWND(w.hwnd.get() as *mut _);
                     window::install(hwnd, &ctx);
+                    if let (Some(r), false) = (settings.window, settings.maximized) {
+                        window::set_outer_rect(hwnd, r);
+                    }
                     window::set_dark(hwnd, pal.dark);
                     if !window::set_glass(hwnd, pal.glass, settings.glass_blur) {
                         pal = pal.solid();
@@ -417,6 +422,7 @@ impl OxideApp {
             popup: None,
             popup_seq: 1,
             dialog: None,
+            props_windows: Vec::new(),
             toast: None,
             undo: vec![],
             new_items: None,
@@ -1206,7 +1212,8 @@ impl OxideApp {
                 p.is_absolute() && p.parent().is_some() && !s.starts_with(r"\\?\") && fs::exists(p)
             });
         if ok {
-            self.dialog = Some(Dialog::Properties(Box::new(crate::ui::props::Props::new(self, ctx, paths))));
+            let p = Box::new(crate::ui::props::Props::new(self, ctx, paths));
+            self.props_windows.push(p);
         }
         ok
     }
@@ -2154,6 +2161,7 @@ impl eframe::App for OxideApp {
             }
         }
         ui::dialogs::show(self, ctx);
+        ui::props::show_windows(self, ctx);
         ui::toast(self, ctx);
 
         self.handle_drops(ctx);
