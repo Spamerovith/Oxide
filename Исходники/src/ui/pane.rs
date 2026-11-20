@@ -1,5 +1,8 @@
 //! Область сведений и область просмотра справа
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use egui::{Align2, CornerRadius, Pos2, Rect, Ui, Vec2};
 
 use super::widgets::*;
@@ -26,7 +29,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
         ui.add_space(16.0);
         if sel.is_empty() {
             let t = app.tab();
-            let msg = if mode == PaneMode::Preview { "Выберите файл для предварительного просмотра" } else { "Выберите один файл, чтобы получить сведения о нём" };
+            let msg = if mode == PaneMode::Preview { tr("Выберите файл для предварительного просмотра") } else { tr("Выберите один файл, чтобы получить сведения о нём") };
             ui.horizontal(|ui| {
                 ui.add_space(16.0);
                 ui.label(egui::RichText::new(msg).font(font(12.0)).color(pal.text2));
@@ -34,7 +37,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.add_space(16.0);
-                ui.label(egui::RichText::new(format!("Элементов: {}", t.entries.len())).font(font(12.0)).color(pal.text2));
+                ui.label(egui::RichText::new(crate::i18n::items(t.entries.len())).font(font(12.0)).color(pal.text2));
             });
             return;
         }
@@ -43,9 +46,9 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
             ui.horizontal(|ui| {
                 ui.add_space(16.0);
                 ui.vertical(|ui| {
-                    ui.label(egui::RichText::new(format!("Выбрано элементов: {}", sel.len())).font(font_sb(14.0)).color(pal.text));
+                    ui.label(egui::RichText::new(crate::i18n::items_selected(sel.len())).font(font_sb(14.0)).color(pal.text));
                     ui.add_space(4.0);
-                    ui.label(egui::RichText::new(format!("Общий размер файлов: {}", crate::util::format_bytes(total))).font(font(12.0)).color(pal.text2));
+                    ui.label(egui::RichText::new(trf("Общий размер файлов: {}", &[&crate::util::format_bytes(total)])).font(font(12.0)).color(pal.text2));
                 });
             });
             return;
@@ -75,30 +78,30 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
         ui.add_space(8.0);
         let rows: Vec<(String, String)> = {
             let mut v = vec![];
-            v.push(("Тип".to_string(), e.type_name.clone().unwrap_or_else(|| fs::type_name(&e.ext, e.is_dir))));
+            v.push((tr("Тип").to_string(), e.type_name.clone().unwrap_or_else(|| fs::type_name(&e.ext, e.is_dir))));
             if !e.is_dir {
-                v.push(("Размер".into(), format!("{} ({} байт)", crate::util::format_bytes(e.size), group(e.size))));
+                v.push((tr("Размер").into(), trf("{} ({} байт)", &[&crate::util::format_bytes(e.size), &group(e.size)])));
             }
             if e.mtime != 0 {
-                v.push(("Дата изменения".into(), crate::util::format_filetime(e.mtime)));
+                v.push((tr("Дата изменения").into(), crate::util::format_filetime(e.mtime)));
             }
             if e.ctime != 0 && e.shell.is_none() {
-                v.push(("Дата создания".into(), crate::util::format_filetime(e.ctime)));
+                v.push((tr("Дата создания").into(), crate::util::format_filetime(e.ctime)));
             }
             let loc = e.location.clone().or_else(|| e.path.parent().map(|p| p.to_string_lossy().to_string())).unwrap_or_default();
-            v.push(("Расположение".into(), loc));
+            v.push((tr("Расположение").into(), loc));
             let mut attrs = vec![];
             if e.attrs & fs::ATTR_HIDDEN != 0 {
-                attrs.push("скрытый");
+                attrs.push(tr("скрытый"));
             }
             if e.attrs & fs::ATTR_READONLY != 0 && !e.is_dir {
-                attrs.push("только чтение");
+                attrs.push(tr("только чтение"));
             }
             if e.attrs & fs::ATTR_SYSTEM != 0 {
-                attrs.push("системный");
+                attrs.push(tr("системный"));
             }
             if !attrs.is_empty() {
-                v.push(("Атрибуты".into(), attrs.join(", ")));
+                v.push((tr("Атрибуты").into(), attrs.join(", ")));
             }
             v
         };
@@ -112,7 +115,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
                 let (r, _) = ui.allocate_exact_size(g.size(), egui::Sense::hover());
                 ui.painter().galley(r.min, g, pal.text);
                 ui.add_space(12.0);
-                ui.label(egui::RichText::new("Свойства").font(font_sb(12.0)).color(pal.text));
+                ui.label(egui::RichText::new(tr("Свойства")).font(font_sb(12.0)).color(pal.text));
                 ui.add_space(4.0);
                 for (k, v) in rows {
                     ui.label(egui::RichText::new(k).font(font(12.0)).color(pal.text2));

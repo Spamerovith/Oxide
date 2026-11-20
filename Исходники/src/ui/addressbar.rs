@@ -1,5 +1,8 @@
 //! Кнопки навигации, адресная строка с «хлебными крошками» и поле поиска
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -18,7 +21,8 @@ thread_local! {
 }
 
 pub fn crumbs(loc: &Location) -> Vec<(String, Location)> {
-    let key = loc.key();
+    // Язык в ключе: после переключения языка названия «Главная» / «Home» не берутся из старого кеша
+    let key = format!("{:?}|{}", crate::i18n::current(), loc.key());
     if let Some(v) = CRUMBS.with(|c| c.borrow().get(&key).cloned()) {
         return v;
     }
@@ -37,7 +41,7 @@ fn path_crumbs(p: &Path) -> Vec<(String, Location)> {
     let s = p.to_string_lossy().to_string();
     let mut out = vec![];
     if s.starts_with(r"\\") {
-        out.push(("Сеть".to_string(), Location::Shell(shellfolder::NETWORK.into())));
+        out.push((tr("Сеть").to_string(), Location::Shell(shellfolder::NETWORK.into())));
         let parts: Vec<&str> = s.trim_start_matches('\\').split('\\').filter(|x| !x.is_empty()).collect();
         let mut acc = String::from(r"\\");
         for (i, part) in parts.iter().enumerate() {
@@ -49,7 +53,7 @@ fn path_crumbs(p: &Path) -> Vec<(String, Location)> {
         }
         return out;
     }
-    out.push(("Этот компьютер".to_string(), Location::ThisPc));
+    out.push((tr("Этот компьютер").to_string(), Location::ThisPc));
     let mut acc = PathBuf::new();
     for (i, comp) in p.components().enumerate() {
         let c = comp.as_os_str().to_string_lossy().to_string();
@@ -76,8 +80,8 @@ fn path_crumbs(p: &Path) -> Vec<(String, Location)> {
 
 fn build_crumbs(loc: &Location) -> Vec<(String, Location)> {
     match loc {
-        Location::Home => vec![("Главная".into(), Location::Home)],
-        Location::ThisPc => vec![("Этот компьютер".into(), Location::ThisPc)],
+        Location::Home => vec![(tr("Главная").into(), Location::Home)],
+        Location::ThisPc => vec![(tr("Этот компьютер").into(), Location::ThisPc)],
         Location::Path(p) => path_crumbs(p),
         Location::Shell(s) => {
             let p = Path::new(s);
@@ -94,8 +98,8 @@ fn build_crumbs(loc: &Location) -> Vec<(String, Location)> {
 
 fn address_text(loc: &Location) -> String {
     match loc {
-        Location::Home => "Главная".into(),
-        Location::ThisPc => "Этот компьютер".into(),
+        Location::Home => tr("Главная").into(),
+        Location::ThisPc => tr("Этот компьютер").into(),
         Location::Path(p) => p.to_string_lossy().to_string(),
         Location::Shell(s) => s.clone(),
     }
@@ -117,7 +121,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let back_title = app.tabs[a].back.last().map(OxideApp::title_of).unwrap_or_default();
     let fwd_title = app.tabs[a].fwd.last().map(OxideApp::title_of).unwrap_or_default();
     let up_title = OxideApp::parent_of(&app.tabs[a].loc).map(|l| OxideApp::title_of(&l)).unwrap_or_default();
-    let r = icon_button(ui, btn(x), Id::new("nav-back"), ICON_BACK, 16.0, &pal, can_back, &format!("Назад к «{back_title}» (Alt+Стрелка влево)"));
+    let r = icon_button(ui, btn(x), Id::new("nav-back"), ICON_BACK, 16.0, &pal, can_back, &trf("Назад к «{}» (Alt+Стрелка влево)", &[&back_title]));
     if r.clicked() {
         app.go_back(&ctx);
     }
@@ -125,7 +129,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
         history_menu(app, &ctx, r.rect, true);
     }
     x += 48.0;
-    let r = icon_button(ui, btn(x), Id::new("nav-fwd"), ICON_FORWARD, 16.0, &pal, can_fwd, &format!("Вперёд к «{fwd_title}» (Alt+Стрелка вправо)"));
+    let r = icon_button(ui, btn(x), Id::new("nav-fwd"), ICON_FORWARD, 16.0, &pal, can_fwd, &trf("Вперёд к «{}» (Alt+Стрелка вправо)", &[&fwd_title]));
     if r.clicked() {
         app.go_forward(&ctx);
     }
@@ -133,12 +137,12 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
         history_menu(app, &ctx, r.rect, false);
     }
     x += 48.0;
-    let r = icon_button(ui, btn(x), Id::new("nav-up"), ICON_UP, 16.0, &pal, can_up, &format!("Вверх к «{up_title}» (Alt+Стрелка вверх)"));
+    let r = icon_button(ui, btn(x), Id::new("nav-up"), ICON_UP, 16.0, &pal, can_up, &trf("Вверх к «{}» (Alt+Стрелка вверх)", &[&up_title]));
     if r.clicked() {
         app.go_up(&ctx);
     }
     x += 48.0;
-    let r = icon_button(ui, btn(x), Id::new("nav-refresh"), ICON_REFRESH, 16.0, &pal, true, &format!("Обновить «{}» (F5)", app.tabs[a].title));
+    let r = icon_button(ui, btn(x), Id::new("nav-refresh"), ICON_REFRESH, 16.0, &pal, true, &trf("Обновить «{}» (F5)", &[&app.tabs[a].title]));
     if r.clicked() {
         app.exec(&ctx, Cmd::Refresh);
     }
@@ -232,7 +236,7 @@ fn address(app: &mut OxideApp, ui: &mut Ui, r: Rect) {
     let mut cr = crumbs(&loc);
     if app.tabs[a].searching() {
         let t = app.tabs[a].title.clone();
-        cr.push((format!("Результаты поиска в «{t}»"), loc.clone()));
+        cr.push((trf("Результаты поиска в «{}»", &[&t]), loc.clone()));
     }
     let start_x = r.left() + 36.0;
     let avail = r.right() - 8.0 - start_x;
@@ -308,10 +312,10 @@ fn address(app: &mut OxideApp, ui: &mut Ui, r: Rect) {
         } else {
             match parent {
                 None => vec![
-                    MenuItem::new("Главная", Cmd::NavigateHome).icon(ICON_HOME),
-                    MenuItem::new("Этот компьютер", Cmd::NavigateThisPc).icon(ICON_PC),
-                    MenuItem::new("Сеть", Cmd::NavigateShell(shellfolder::NETWORK.into())).icon(ICON_NETWORK),
-                    MenuItem::new("Корзина", Cmd::NavigateShell(shellfolder::RECYCLE_BIN.into())).icon(ICON_DELETE),
+                    MenuItem::new(tr("Главная"), Cmd::NavigateHome).icon(ICON_HOME),
+                    MenuItem::new(tr("Этот компьютер"), Cmd::NavigateThisPc).icon(ICON_PC),
+                    MenuItem::new(tr("Сеть"), Cmd::NavigateShell(shellfolder::NETWORK.into())).icon(ICON_NETWORK),
+                    MenuItem::new(tr("Корзина"), Cmd::NavigateShell(shellfolder::RECYCLE_BIN.into())).icon(ICON_DELETE),
                 ],
                 Some(Location::ThisPc) => app
                     .drives
@@ -387,8 +391,8 @@ fn go_address(app: &mut OxideApp, ctx: &egui::Context, text: &str) {
     // Как в Проводнике: команда (cmd, notepad, https://...) запускается
     if !crate::shell::menu::shell_execute(&expanded, None, None) {
         app.dialog = Some(crate::app::Dialog::Message {
-            title: "Проводник Oxide".into(),
-            text: format!("Не удаётся найти «{text}». Проверьте правильность написания и повторите попытку"),
+            title: tr("Проводник Oxide").into(),
+            text: trf("Не удаётся найти «{}». Проверьте правильность написания и повторите попытку", &[&text]),
         });
     }
 }
@@ -447,7 +451,7 @@ fn search(app: &mut OxideApp, ui: &mut Ui, r: Rect) {
     let icon_r = Rect::from_center_size(Pos2::new(r.right() - 18.0, r.center().y), Vec2::new(28.0, 24.0));
     let inner = Rect::from_min_max(Pos2::new(r.left() + 10.0, r.top() + 4.0), Pos2::new(icon_r.left() - if has_text { 28.0 } else { 2.0 }, r.bottom() - 4.0));
     let mut text = app.tabs[a].search_text.clone();
-    let hint = format!("Поиск в: {}", app.tabs[a].title);
+    let hint = trf("Поиск в: {}", &[&app.tabs[a].title]);
     let out = ui
         .scope_builder(egui::UiBuilder::new().max_rect(inner), |ui| {
             TextEdit::singleline(&mut text)
@@ -486,7 +490,7 @@ fn search(app: &mut OxideApp, ui: &mut Ui, r: Rect) {
     }
     if has_text {
         let cr = Rect::from_center_size(Pos2::new(icon_r.left() - 12.0, r.center().y), Vec2::new(24.0, 24.0));
-        let resp = icon_button(ui, cr, Id::new("search-clear"), ICON_CLOSE, 10.0, &pal, true, "Очистить");
+        let resp = icon_button(ui, cr, Id::new("search-clear"), ICON_CLOSE, 10.0, &pal, true, tr("Очистить"));
         if resp.clicked() {
             app.end_search(&ctx, a);
         }

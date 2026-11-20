@@ -1,13 +1,20 @@
 //! Диалоги: «Параметры» (с выбором интерфейса), сообщения, «О программе»
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use egui::{Align2, CornerRadius, Id, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
 
 use super::widgets::*;
 use crate::app::{Dialog, OxideApp};
+use crate::i18n::{is_en, l, Lang};
+use crate::update::State as UpState;
 use crate::settings::OpenTo;
 use crate::theme::{m, Palette, ThemeChoice};
 
-pub const DISCLAIMER: &str = "Oxide - независимый проект с открытым исходным кодом. Он не связан с Microsoft, не одобрен и не поддерживается ею. Windows и Windows 11 - товарные знаки Microsoft Corporation. Сторонние библиотеки и их лицензии перечислены в файле THIRD_PARTY_LICENSES.md";
+pub fn disclaimer() -> &'static str {
+    tr("Oxide - независимый проект с открытым исходным кодом. Он не связан с Microsoft, не одобрен и не поддерживается ею. Windows и Windows 11 - товарные знаки Microsoft Corporation. Сторонние библиотеки и их лицензии перечислены в файле THIRD_PARTY_LICENSES.md")
+}
 
 pub fn show(app: &mut OxideApp, ctx: &egui::Context) {
     let Some(d) = app.dialog.take() else { return };
@@ -32,36 +39,92 @@ pub fn show(app: &mut OxideApp, ctx: &egui::Context) {
             ui.add(egui::Label::new(egui::RichText::new(text).font(font(14.0)).color(pal.text)).wrap());
             ui.add_space(24.0);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if button(ui, "ОК", true, &pal, 120.0).clicked() {
+                if button(ui, tr("ОК"), true, &pal, 120.0).clicked() {
                     keep = false;
                 }
+            });
+        }
+        Dialog::Language => {
+            ui.set_width(420.0);
+            ui.label(egui::RichText::new("Язык интерфейса / Language").font(font_sb(20.0)).color(pal.text));
+            ui.add_space(12.0);
+            ui.add(egui::Label::new(egui::RichText::new("Его можно изменить в параметрах
+You can change it later in Options").font(font(14.0)).color(pal.text2)).wrap());
+            ui.add_space(24.0);
+            let sys = Lang::system();
+            let mut pick = None;
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                for lang in [Lang::En, Lang::Ru] {
+                    if button(ui, lang.native_name(), lang == sys, &pal, 120.0).clicked() {
+                        pick = Some(lang);
+                    }
+                }
+            });
+            if let Some(lang) = pick {
+                app.set_language(&ctx, lang);
+                keep = false;
+                if app.settings.show_about_on_start {
+                    app.dialog = Some(Dialog::About);
+                }
+            }
+        }
+        Dialog::Update(rel) => {
+            ui.set_width(440.0);
+            ui.label(egui::RichText::new(l("Доступна новая версия Oxide", "A new version of Oxide is available")).font(font_sb(20.0)).color(pal.text));
+            ui.add_space(12.0);
+            let cur = env!("CARGO_PKG_VERSION");
+            let text = if is_en() {
+                format!("Version {} is ready to install, you have {cur}. Your settings, tabs, pinned folders and search index will stay as they are", rel.version)
+            } else {
+                format!("Версия {} готова к установке, сейчас у вас {cur}. Настройки, вкладки, закреплённые папки и индекс поиска останутся как есть", rel.version)
+            };
+            ui.add(egui::Label::new(egui::RichText::new(text).font(font(14.0)).color(pal.text)).wrap());
+            ui.add_space(24.0);
+            ui.horizontal(|ui| {
+                let link = ui
+                    .add(egui::Label::new(egui::RichText::new(l("Что нового", "What's new")).font(font(14.0)).color(pal.accent)).sense(Sense::click()))
+                    .on_hover_cursor(egui::CursorIcon::PointingHand);
+                if link.clicked() {
+                    crate::shell::menu::open_url(&rel.page);
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if button(ui, l("Позже", "Later"), false, &pal, 120.0).clicked() {
+                        keep = false;
+                    }
+                    ui.add_space(8.0);
+                    if button(ui, l("Обновить", "Update"), true, &pal, 120.0).clicked() {
+                        app.updater.install(&ctx, rel.clone());
+                        keep = false;
+                    }
+                });
             });
         }
         Dialog::About => {
             ui.set_width(420.0);
             ui.label(egui::RichText::new("Oxide").font(font_sb(20.0)).color(pal.text));
             ui.add_space(4.0);
-            ui.label(egui::RichText::new(format!("Версия {}", env!("CARGO_PKG_VERSION"))).font(font(14.0)).color(pal.text2));
+            ui.label(egui::RichText::new(trf("Версия {}", &[&env!("CARGO_PKG_VERSION")])).font(font(14.0)).color(pal.text2));
             ui.add_space(12.0);
-            ui.add(egui::Label::new(egui::RichText::new("Быстрый проводник для Windows на Rust. Интерфейс повторяет Проводник Windows 11, а файловые операции выполняет сам движок Windows").font(font(14.0)).color(pal.text)).wrap());
+            ui.add(egui::Label::new(egui::RichText::new(tr("Быстрый проводник для Windows на Rust. Интерфейс повторяет Проводник Windows 11, а файловые операции выполняет сам движок Windows")).font(font(14.0)).color(pal.text)).wrap());
             ui.add_space(12.0);
-            ui.add(egui::Label::new(egui::RichText::new(DISCLAIMER).font(font(12.0)).color(pal.text2)).wrap());
+            ui.add(egui::Label::new(egui::RichText::new(disclaimer()).font(font(12.0)).color(pal.text2)).wrap());
             ui.add_space(24.0);
             ui.horizontal(|ui| {
                 let mut dont = !app.settings.show_about_on_start;
-                if checkbox(ui, &mut dont, "Больше не показывать", &pal).changed() {
+                if checkbox(ui, &mut dont, tr("Больше не показывать"), &pal).changed() {
                     app.settings.show_about_on_start = !dont;
                     app.mark_settings(&ctx);
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if button(ui, "Закрыть", true, &pal, 120.0).clicked() {
+                    if button(ui, tr("Закрыть"), true, &pal, 120.0).clicked() {
                         keep = false;
                     }
                 });
             });
         }
     });
-    if resp.should_close() {
+    // Язык нужно выбрать: Esc и щелчок мимо окна его не закрывают
+    if resp.should_close() && !matches!(d, Dialog::Language) {
         keep = false;
     }
     if keep {
@@ -79,10 +142,10 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
     let ctx = ui.ctx().clone();
     let pal = app.pal.clone();
     ui.set_width(680.0);
-    ui.label(egui::RichText::new("Параметры").font(font_sb(20.0)).color(pal.text));
+    ui.label(egui::RichText::new(tr("Параметры")).font(font_sb(20.0)).color(pal.text));
     egui::ScrollArea::vertical().max_height((ctx.screen_rect().height() - 200.0).max(240.0)).auto_shrink([false, true]).show(ui, |ui| {
         ui.set_width(660.0);
-        group_title(ui, &pal, "Интерфейс");
+        group_title(ui, &pal, tr("Интерфейс"));
         let card = Vec2::new(152.0, 128.0);
         let cols = 4;
         let n = ThemeChoice::ALL.len();
@@ -113,41 +176,53 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
             app.set_theme(&ctx, t);
         }
 
-        group_title(ui, &pal, "Открывать проводник для");
+        group_title(ui, &pal, l("Язык", "Language"));
         ui.horizontal(|ui| {
-            if radio(ui, app.settings.open_to == OpenTo::Home, "Главная", &pal).clicked() {
+            for (i, lang) in Lang::ALL.iter().enumerate() {
+                if i > 0 {
+                    ui.add_space(16.0);
+                }
+                if radio(ui, crate::i18n::current() == *lang, lang.native_name(), &pal).clicked() {
+                    app.set_language(&ctx, *lang);
+                }
+            }
+        });
+
+        group_title(ui, &pal, tr("Открывать проводник для"));
+        ui.horizontal(|ui| {
+            if radio(ui, app.settings.open_to == OpenTo::Home, tr("Главная"), &pal).clicked() {
                 app.settings.open_to = OpenTo::Home;
                 app.mark_settings(&ctx);
             }
             ui.add_space(16.0);
-            if radio(ui, app.settings.open_to == OpenTo::ThisPc, "Этот компьютер", &pal).clicked() {
+            if radio(ui, app.settings.open_to == OpenTo::ThisPc, tr("Этот компьютер"), &pal).clicked() {
                 app.settings.open_to = OpenTo::ThisPc;
                 app.mark_settings(&ctx);
             }
         });
 
-        group_title(ui, &pal, "Вид");
+        group_title(ui, &pal, tr("Вид"));
         let s = &mut app.settings;
         let mut changed = false;
         let mut reload = false;
-        changed |= toggle(ui, &mut s.compact, "Компактный вид", &pal).changed();
-        let r = toggle(ui, &mut s.show_hidden, "Показывать скрытые файлы, папки и диски", &pal).changed();
+        changed |= toggle(ui, &mut s.compact, tr("Компактный вид"), &pal).changed();
+        let r = toggle(ui, &mut s.show_hidden, tr("Показывать скрытые файлы, папки и диски"), &pal).changed();
         reload |= r;
-        let r = toggle(ui, &mut s.show_ext, "Показывать расширения имён файлов", &pal).changed();
+        let r = toggle(ui, &mut s.show_ext, tr("Показывать расширения имён файлов"), &pal).changed();
         reload |= r;
-        let r = toggle(ui, &mut s.show_super_hidden, "Показывать защищённые системные файлы", &pal).changed();
+        let r = toggle(ui, &mut s.show_super_hidden, tr("Показывать защищённые системные файлы"), &pal).changed();
         reload |= r;
-        changed |= toggle(ui, &mut s.checkboxes, "Использовать флажки для выбора элементов", &pal).changed();
-        changed |= toggle(ui, &mut s.restore_tabs, "Восстанавливать вкладки при следующем запуске", &pal).changed();
+        changed |= toggle(ui, &mut s.checkboxes, tr("Использовать флажки для выбора элементов"), &pal).changed();
+        changed |= toggle(ui, &mut s.restore_tabs, tr("Восстанавливать вкладки при следующем запуске"), &pal).changed();
 
-        group_title(ui, &pal, "Конфиденциальность");
-        let r = toggle(ui, &mut s.show_recent, "Показывать недавно использовавшиеся файлы на главной", &pal).changed();
+        group_title(ui, &pal, tr("Конфиденциальность"));
+        let r = toggle(ui, &mut s.show_recent, tr("Показывать недавно использовавшиеся файлы на главной"), &pal).changed();
         changed |= r;
         let quick_reload = r;
 
-        group_title(ui, &pal, "Поиск");
+        group_title(ui, &pal, tr("Поиск"));
         let mut idx = s.index_enabled;
-        let idx_changed = toggle(ui, &mut idx, "Индексировать диски для мгновенного поиска", &pal).changed();
+        let idx_changed = toggle(ui, &mut idx, tr("Индексировать диски для мгновенного поиска"), &pal).changed();
         s.index_enabled = idx;
         changed |= idx_changed;
         let status = {
@@ -155,16 +230,14 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
             let prog = app.engine.progress.load(std::sync::atomic::Ordering::Relaxed);
             let info = app.engine.index.read().ok().and_then(|g| g.as_ref().map(|ix| (ix.len(), ix.disk_bytes(), ix.built)));
             let mut t = match info {
-                Some((n, bytes, built)) => format!(
+                Some((n, bytes, built)) => trf(
                     "В индексе {} объектов (на диске {}, обновлён {}). Индекс читается с диска по мере надобности и почти не занимает оперативную память",
-                    n,
-                    crate::util::format_bytes(bytes as u64),
-                    crate::util::format_filetime(built)
+                    &[&n, &crate::util::format_bytes(bytes as u64), &crate::util::format_filetime(built)],
                 ),
-                None => "Индекс ещё не построен: поиск идёт по папкам напрямую".into(),
+                None => tr("Индекс ещё не построен: поиск идёт по папкам напрямую").into(),
             };
             if building {
-                t.push_str(&format!(" Обновление… обработано объектов: {prog}"));
+                t.push_str(&trf(" Обновление… обработано объектов: {}", &[&prog]));
             }
             t
         };
@@ -173,7 +246,7 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
             app.engine.start(ctx.clone());
         }
         ui.add_space(4.0);
-        if !app.engine.building.load(std::sync::atomic::Ordering::Relaxed) && app.settings.index_enabled && button(ui, "Перестроить индекс", false, &pal, 160.0).clicked() {
+        if !app.engine.building.load(std::sync::atomic::Ordering::Relaxed) && app.settings.index_enabled && button(ui, tr("Перестроить индекс"), false, &pal, 160.0).clicked() {
             app.engine.build(ctx.clone());
         }
         if changed || reload {
@@ -186,17 +259,59 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
         if quick_reload {
             app.load_quick(&ctx);
         }
+
+        updates(app, ui, &pal);
         ui.add_space(8.0);
     });
     ui.add_space(16.0);
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(format!("Oxide {}", env!("CARGO_PKG_VERSION"))).font(font(12.0)).color(pal.text3));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if button(ui, "Закрыть", true, &pal, 120.0).clicked() {
+            if button(ui, tr("Закрыть"), true, &pal, 120.0).clicked() {
                 *keep = false;
             }
         });
     });
+}
+
+/// Раздел «Обновления»: автопроверка, состояние, кнопка проверки или установки
+fn updates(app: &mut OxideApp, ui: &mut Ui, pal: &Palette) {
+    let ctx = ui.ctx().clone();
+    group_title(ui, pal, l("Обновления", "Updates"));
+    let mut auto = app.settings.check_updates;
+    if toggle(ui, &mut auto, l("Проверять обновления автоматически", "Check for updates automatically"), pal).changed() {
+        app.settings.check_updates = auto;
+        app.mark_settings(&ctx);
+    }
+    let cur = env!("CARGO_PKG_VERSION");
+    let st = app.updater.state();
+    let status = match &st {
+        UpState::Idle => if is_en() { format!("Version {cur} is installed") } else { format!("Установлена версия {cur}") },
+        UpState::Checking { .. } => l("Проверка обновлений…", "Checking for updates…").into(),
+        UpState::UpToDate => if is_en() { format!("You have the latest version, {cur}") } else { format!("У вас последняя версия, {cur}") },
+        UpState::Available(r) => if is_en() { format!("Version {} is available, you have {cur}", r.version) } else { format!("Доступна версия {}, у вас {cur}", r.version) },
+        UpState::Downloading { rel, got } => {
+            let pct = if rel.size > 0 { (*got * 100 / rel.size).min(100) } else { 0 };
+            if is_en() { format!("Downloading version {}: {pct} %", rel.version) } else { format!("Загрузка версии {}: {pct} %", rel.version) }
+        }
+        UpState::Installed(_) => l("Перезапуск…", "Restarting…").into(),
+        UpState::Failed { text, .. } => text.clone(),
+    };
+    ui.add(egui::Label::new(egui::RichText::new(status).font(font(12.0)).color(pal.text2)).wrap());
+    ui.add_space(4.0);
+    match st {
+        UpState::Available(rel) => {
+            if button(ui, l("Обновить", "Update"), true, pal, 160.0).clicked() {
+                app.updater.install(&ctx, rel);
+            }
+        }
+        UpState::Idle | UpState::UpToDate | UpState::Failed { .. } => {
+            if button(ui, l("Проверить обновления", "Check for updates"), false, pal, 160.0).clicked() {
+                app.updater.check(&ctx, true);
+            }
+        }
+        _ => {}
+    }
 }
 
 /// Миниатюра окна в выбранной теме

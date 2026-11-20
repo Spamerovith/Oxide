@@ -1,11 +1,13 @@
 //! Строка состояния: «Элементов: N | Выбрано …» и переключатели вида справа
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use egui::{Align2, Id, Pos2, Rect, Ui, Vec2};
 
 use super::widgets::*;
 use crate::app::{Location, OxideApp};
 use crate::cmd::{Cmd, ViewMode};
-use crate::util::plural;
 
 pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let rect = ui.max_rect();
@@ -16,23 +18,23 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let mut text = String::new();
     match &t.loc {
         Location::Home if !t.searching() => {
-            text = format!("Элементов: {}", app.quick.len() + if app.settings.show_recent { app.recent.len() } else { 0 });
+            text = crate::i18n::items(app.quick.len() + if app.settings.show_recent { app.recent.len() } else { 0 });
         }
         Location::ThisPc if !t.searching() => {
-            text = format!("Элементов: {}", app.drives.len());
+            text = crate::i18n::items(app.drives.len());
         }
         _ => {
             if t.loading && t.entries.is_empty() {
-                text = if t.searching() { "Поиск…".into() } else { "Загрузка…".into() };
+                text = if t.searching() { tr("Поиск…").into() } else { tr("Загрузка…").into() };
             } else {
-                text = format!("Элементов: {}", t.entries.len());
+                text = crate::i18n::items(t.entries.len());
                 if t.search.as_ref().map(|s| s.running).unwrap_or(false) {
-                    text.push_str("   |   Поиск продолжается…");
+                    text.push_str(tr("   |   Поиск продолжается…"));
                 }
                 let sel = t.selected_entries();
                 if !sel.is_empty() {
                     let n = sel.len();
-                    text.push_str(&format!("   |   {} {} {}", plural(n, "Выбран", "Выбрано", "Выбрано"), n, plural(n, "элемент", "элемента", "элементов")));
+                    text.push_str(&format!("   |   {}", crate::i18n::items_selected(n)));
                     let files: Vec<_> = sel.iter().filter(|e| !e.is_dir).collect();
                     if !files.is_empty() && files.len() == n {
                         let total: u64 = files.iter().map(|e| e.size).sum();
@@ -46,7 +48,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     if app.engine.building.load(std::sync::atomic::Ordering::Relaxed) && !app.engine.ready() {
         let n = app.engine.progress.load(std::sync::atomic::Ordering::Relaxed);
         if n > 0 {
-            text.push_str(&format!("      Индексация для быстрого поиска: {n}"));
+            text.push_str(&trf("      Индексация для быстрого поиска: {}", &[&n]));
             ctx.request_repaint_after(std::time::Duration::from_millis(500));
         }
     }
@@ -58,8 +60,8 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let r1 = r2.translate(Vec2::new(-28.0, 0.0));
     let listing = app.tab().loc.is_listing() || app.tab().searching();
     for (r, mode, icon, tip) in [
-        (r1, ViewMode::Details, ICON_V_DETAILS, "Отображает сведения о каждом элементе в окне (Ctrl+Shift+6)"),
-        (r2, ViewMode::Large, ICON_V_L, "Отображение элементов в виде крупных эскизов (Ctrl+Shift+2)"),
+        (r1, ViewMode::Details, ICON_V_DETAILS, tr("Отображает сведения о каждом элементе в окне (Ctrl+Shift+6)")),
+        (r2, ViewMode::Large, ICON_V_L, tr("Отображение элементов в виде крупных эскизов (Ctrl+Shift+2)")),
     ] {
         let on = view == mode && listing;
         if on {

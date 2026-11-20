@@ -1,5 +1,8 @@
 //! Цветовые темы и метрики. Значения описаны в DESIGN.md - меняются только вместе
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use egui::{Color32, CornerRadius, Stroke, Visuals};
 use serde::{Deserialize, Serialize};
 
@@ -26,13 +29,13 @@ impl ThemeChoice {
     ];
     pub fn title(self) -> &'static str {
         match self {
-            ThemeChoice::System => "Как в Windows",
-            ThemeChoice::Light => "Windows 11 - светлая",
-            ThemeChoice::Dark => "Windows 11 - тёмная",
+            ThemeChoice::System => tr("Как в Windows"),
+            ThemeChoice::Light => tr("Windows 11 - светлая"),
+            ThemeChoice::Dark => tr("Windows 11 - тёмная"),
             ThemeChoice::Oxide => "Oxide",
-            ThemeChoice::Graphite => "Графит",
-            ThemeChoice::Nordic => "Северная ночь",
-            ThemeChoice::Paper => "Бумага",
+            ThemeChoice::Graphite => tr("Графит"),
+            ThemeChoice::Nordic => tr("Северная ночь"),
+            ThemeChoice::Paper => tr("Бумага"),
         }
     }
 }

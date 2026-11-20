@@ -1,5 +1,8 @@
 //! Полоса вкладок в заголовке окна и кнопки «Свернуть / Развернуть / Закрыть»
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use std::sync::atomic::Ordering;
 
 use egui::{Color32, CornerRadius, Id, Pos2, Rect, Sense, Ui, Vec2};
@@ -96,12 +99,12 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     }
     interactive.push(phys(close_r));
 
-    // Вкладки
-    let left = rect.left() + 8.0;
+    // Кнопка «Обновить» слева, пока есть новая версия, затем вкладки
+    let top = rect.top() + (m::TITLE_H - m::TAB_H);
+    let left = update_button(app, ui, &pal, rect.left() + 8.0, top, &mut interactive, &phys);
     let right_limit = min_r.left() - 48.0;
     let n = app.tabs.len().max(1) as f32;
     let tab_w = ((right_limit - left - 40.0) / n).clamp(m::TAB_MIN_W, m::TAB_MAX_W);
-    let top = rect.top() + (m::TITLE_H - m::TAB_H);
     let mut x = left;
     let mut action: Option<Cmd> = None;
     let mut activate: Option<usize> = None;
@@ -121,6 +124,8 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
         }
         let is_active = i == active;
         let resp = ui.interact(r, Id::new(("tab", app.tabs[i].id)), Sense::click_and_drag());
+        // По прямоугольнику, а не по виджету: над крестиком вкладка тоже считается наведённой
+        let tab_hovered = app.tab_drag.is_none() && ui.rect_contains_pointer(r);
         interactive.push(phys(r));
         let p = ui.painter();
         if is_active {
@@ -135,7 +140,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
             p.rect_filled(br, CornerRadius::ZERO, pal.layer);
             p.circle_filled(Pos2::new(r.right() + ear, rect.bottom() - ear), ear, pal.base);
         } else {
-            let t = ctx.animate_bool_with_time(resp.id.with("hv"), resp.hovered(), m::T_HOVER);
+            let t = ctx.animate_bool_with_time(resp.id.with("hv"), tab_hovered, m::T_HOVER);
             if t > 0.0 {
                 let hr = Rect::from_min_max(Pos2::new(r.left() + 2.0, r.top() + 2.0), Pos2::new(r.right() - 2.0, r.bottom() - 4.0));
                 p.rect_filled(hr, CornerRadius::same(m::R_CTRL), pal.fill(pal.hover.gamma_multiply(t)));
@@ -150,8 +155,8 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
         let cy = r.center().y - if is_active { 0.0 } else { 2.0 };
         let loc = app.tabs[i].loc.clone();
         paint_loc_icon(app, ui, &loc, Pos2::new(r.left() + 20.0, cy));
-        let title = if app.tabs[i].searching() { format!("Поиск: {}", app.tabs[i].search_text) } else { app.tabs[i].title.clone() };
-        let show_close = is_active || resp.hovered();
+        let title = if app.tabs[i].searching() { trf("Поиск: {}", &[&app.tabs[i].search_text]) } else { app.tabs[i].title.clone() };
+        let show_close = is_active || tab_hovered;
         let tw = r.width() - 36.0 - if show_close { 32.0 } else { 8.0 };
         text_trunc(ui.painter(), Pos2::new(r.left() + 36.0, cy), &title, font(12.0), if is_active { pal.text } else { pal.text2 }, tw);
         let mut close_hit = false;
@@ -164,7 +169,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
                 action = Some(Cmd::CloseTab(i));
                 close_hit = true;
             }
-            let _ = cresp.on_hover_text("Закрыть вкладку (Ctrl+W)");
+            let _ = cresp.on_hover_text(tr("Закрыть вкладку (Ctrl+W)"));
         }
         if !close_hit {
             if resp.clicked() || resp.drag_started() {
@@ -216,7 +221,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
 
     // «+» - новая вкладка
     let plus = Rect::from_center_size(Pos2::new(x + 24.0, top + m::TAB_H / 2.0 - 2.0), Vec2::new(32.0, 32.0));
-    let presp = icon_button(ui, plus, Id::new("newtab"), ICON_ADD, 12.0, &pal, true, "Новая вкладка (Ctrl+T)");
+    let presp = icon_button(ui, plus, Id::new("newtab"), ICON_ADD, 12.0, &pal, true, tr("Новая вкладка (Ctrl+T)"));
     interactive.push(phys(plus));
     if presp.clicked() {
         action = Some(Cmd::NewTab);
@@ -233,19 +238,79 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
         let id = app.new_popup_id();
         let n = app.tabs.len();
         let items = vec![
-            MenuItem::new("Новая вкладка", Cmd::NewTab).icon(ICON_ADD).key("Ctrl+T"),
-            MenuItem::new("Дублировать вкладку", Cmd::DuplicateTab(i)),
-            MenuItem::new("Переместить в новое окно", Cmd::TabToWindow(i)).icon(ICON_NEW_WINDOW).enabled(n > 1),
+            MenuItem::new(tr("Новая вкладка"), Cmd::NewTab).icon(ICON_ADD).key("Ctrl+T"),
+            MenuItem::new(tr("Дублировать вкладку"), Cmd::DuplicateTab(i)),
+            MenuItem::new(tr("Переместить в новое окно"), Cmd::TabToWindow(i)).icon(ICON_NEW_WINDOW).enabled(n > 1),
             MenuItem::sep(),
-            MenuItem::new("Закрыть вкладку", Cmd::CloseTab(i)).icon(ICON_CLOSE).key("Ctrl+W"),
-            MenuItem::new("Закрыть другие вкладки", Cmd::CloseOtherTabs(i)).enabled(n > 1),
-            MenuItem::new("Закрыть вкладки справа", Cmd::CloseTabsRight(i)).enabled(i + 1 < n),
+            MenuItem::new(tr("Закрыть вкладку"), Cmd::CloseTab(i)).icon(ICON_CLOSE).key("Ctrl+W"),
+            MenuItem::new(tr("Закрыть другие вкладки"), Cmd::CloseOtherTabs(i)).enabled(n > 1),
+            MenuItem::new(tr("Закрыть вкладки справа"), Cmd::CloseTabsRight(i)).enabled(i + 1 < n),
         ];
         app.open_popup(Popup::new(id, pos, items, now(&ctx)));
     }
     if let Some(c) = action {
         app.exec(&ctx, c);
     }
+}
+
+/// Акцентная кнопка обновления в левом верхнем углу. Возвращает, откуда начинать вкладки
+fn update_button(app: &mut OxideApp, ui: &mut Ui, pal: &crate::theme::Palette, x: f32, top: f32, interactive: &mut Vec<[i32; 4]>, phys: &dyn Fn(Rect) -> [i32; 4]) -> f32 {
+    use crate::i18n::{is_en, l};
+    use crate::update::State;
+    let st = app.updater.state();
+    let (label, progress, tip) = match &st {
+        State::Available(r) => (
+            l("Обновить", "Update").to_string(),
+            None,
+            if is_en() { format!("Update Oxide to version {}", r.version) } else { format!("Обновить Oxide до версии {}", r.version) },
+        ),
+        State::Downloading { rel, got } => {
+            let f = if rel.size > 0 { (*got as f32 / rel.size as f32).clamp(0.0, 1.0) } else { 0.0 };
+            (format!("{} %", (f * 100.0) as u32), Some(f), l("Загрузка обновления", "Downloading the update").to_string())
+        }
+        State::Installed(_) => (l("Перезапуск…", "Restarting…").to_string(), Some(1.0), String::new()),
+        _ => return x,
+    };
+    let ctx = ui.ctx().clone();
+    let h = 28.0;
+    let tw = text_width(ui, &label, font(12.0));
+    let w = (12.0 + 16.0 + 8.0 + tw + 12.0).max(96.0);
+    let cy = top + m::TAB_H / 2.0 - 2.0;
+    let r = Rect::from_min_size(Pos2::new(x, cy - h / 2.0), Vec2::new(w, h));
+    let clickable = progress.is_none();
+    let resp = ui.interact(r, Id::new("update-btn"), if clickable { Sense::click() } else { Sense::hover() });
+    let p = ui.painter();
+    let radius = CornerRadius::same(m::R_CTRL);
+    match progress {
+        None => {
+            let t = ctx.animate_bool_with_time(resp.id.with("hv"), resp.hovered(), m::T_HOVER);
+            let fill = if resp.is_pointer_button_down_on() {
+                pal.fill(pal.accent.gamma_multiply(0.8))
+            } else {
+                pal.fill(pal.accent.gamma_multiply(1.0 - 0.1 * t))
+            };
+            p.rect_filled(r, radius, fill);
+        }
+        Some(f) => {
+            p.rect_filled(r, radius, pal.fill(pal.accent.gamma_multiply(0.45)));
+            let done = Rect::from_min_size(r.min, Vec2::new(r.width() * f, r.height()));
+            p.with_clip_rect(done).rect_filled(r, radius, pal.accent);
+        }
+    }
+    let off = if resp.is_pointer_button_down_on() { 0.5 } else { 0.0 };
+    glyph(p, Pos2::new(r.left() + 12.0 + 8.0, cy + off), ICON_DOWNLOAD, 16.0, pal.on_accent);
+    p.text(Pos2::new(r.left() + 12.0 + 16.0 + 8.0, cy + off), egui::Align2::LEFT_CENTER, &label, font(12.0), pal.on_accent);
+    interactive.push(phys(r));
+    if !tip.is_empty() {
+        let resp = resp.on_hover_text(tip);
+        if resp.clicked() {
+            if let State::Available(rel) = st {
+                app.updater.install(&ctx, rel);
+            }
+        }
+    }
+    // Отступ больше скругления активной вкладки, чтобы её «ушко» не наезжало на кнопку
+    r.right() + 16.0
 }
 
 fn caption_bg(ui: &Ui, resp: &egui::Response, r: Rect, pal: &crate::theme::Palette, _close: bool) {

@@ -1,5 +1,8 @@
 //! Все команды приложения: из меню, кнопок и горячих клавиш
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -29,14 +32,14 @@ impl ViewMode {
     ];
     pub fn title(self) -> &'static str {
         match self {
-            ViewMode::ExtraLarge => "Огромные значки",
-            ViewMode::Large => "Крупные значки",
-            ViewMode::Medium => "Обычные значки",
-            ViewMode::Small => "Мелкие значки",
-            ViewMode::List => "Список",
-            ViewMode::Details => "Таблица",
-            ViewMode::Tiles => "Плитка",
-            ViewMode::Content => "Содержимое",
+            ViewMode::ExtraLarge => tr("Огромные значки"),
+            ViewMode::Large => tr("Крупные значки"),
+            ViewMode::Medium => tr("Обычные значки"),
+            ViewMode::Small => tr("Мелкие значки"),
+            ViewMode::List => tr("Список"),
+            ViewMode::Details => tr("Таблица"),
+            ViewMode::Tiles => tr("Плитка"),
+            ViewMode::Content => tr("Содержимое"),
         }
     }
     pub fn shortcut(self) -> &'static str {
@@ -93,12 +96,12 @@ pub enum SortCol {
 impl SortCol {
     pub fn title(self) -> &'static str {
         match self {
-            SortCol::Name => "Имя",
-            SortCol::Modified => "Дата изменения",
-            SortCol::Type => "Тип",
-            SortCol::Size => "Размер",
-            SortCol::Location => "Папка",
-            SortCol::Extra => "Дата",
+            SortCol::Name => tr("Имя"),
+            SortCol::Modified => tr("Дата изменения"),
+            SortCol::Type => tr("Тип"),
+            SortCol::Size => tr("Размер"),
+            SortCol::Location => tr("Папка"),
+            SortCol::Extra => tr("Дата"),
         }
     }
 }

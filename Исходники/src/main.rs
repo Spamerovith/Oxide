@@ -4,11 +4,13 @@
 mod app;
 mod cmd;
 mod fonts;
+mod i18n;
 mod search;
 mod settings;
 mod shell;
 mod theme;
 mod ui;
+mod update;
 mod util;
 
 fn main() -> eframe::Result<()> {
@@ -16,6 +18,8 @@ fn main() -> eframe::Result<()> {
         let _ = windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_APARTMENTTHREADED);
     }
     let settings = settings::Settings::load();
+    i18n::set(settings.language.unwrap_or_else(i18n::Lang::system));
+    update::cleanup();
     let start = std::env::args().nth(1);
 
     let icon = eframe::icon_data::from_png_bytes(include_bytes!("../assets/oxide.png")).ok();

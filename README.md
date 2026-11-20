@@ -17,6 +17,8 @@
 - Главная, Этот компьютер, Галерея, Сеть, Корзина, ZIP-архивы как папки
 - Те же горячие клавиши, что в Проводнике
 - Семь тем: как в Windows, Windows 11 светлая и тёмная, Oxide, Графит, Северная ночь, Бумага
+- Русский и английский интерфейс: язык выбирается при первом запуске, поменять можно в параметрах
+- Обновления прямо из программы: когда на GitHub выходит новая версия, Oxide предлагает её установить
 
 ## Установка
 
@@ -26,6 +28,17 @@
 
 Файл не подписан цифровой подписью, поэтому при первом запуске Windows SmartScreen может показать
 «Неизвестный издатель»: нажмите «Подробнее» → «Выполнить в любом случае»
+
+## Обновление
+
+Oxide сам проверяет новые версии на этой странице. Когда она выходит, появляется окно с предложением
+обновиться, а слева вверху кнопка «Обновить». Новый exe скачивается, проверяется по SHA-256 из релиза
+и встаёт на место старого, затем Oxide перезапускается с теми же вкладками
+
+Настройки (`%APPDATA%\Oxide`), закреплённые папки и индекс поиска (`%LOCALAPPDATA%\Oxide`) хранятся
+отдельно от exe, поэтому обновление их не трогает. Автопроверку можно выключить в параметрах
+
+Версия 1.1.0 и старше обновляться сами не умеют: один раз скачайте новую версию вручную
 
 ## Сборка из исходников
 
@@ -50,3 +63,15 @@ Oxide - независимый проект. Он не связан с Microsoft
 
 Windows и Windows 11 - товарные знаки Microsoft Corporation. Шрифты и значки Windows программа
 не содержит: она берёт их из системы на компьютере пользователя
+
+## English
+
+Oxide is a fast, lightweight file explorer for Windows written in Rust. It looks and works like
+Windows 11 File Explorer, so there is nothing to relearn. The interface is available in English and
+Russian: pick the language on first launch and change it later in Options. Oxide checks this page for
+new versions and updates itself in place, keeping your settings, tabs, pinned folders and search index
+
+Download `Oxide.exe` from [Releases](../../releases) and run it, no installation needed. Requires
+Windows 10 or 11 (x64)
+
+Oxide is an independent project and is not affiliated with, endorsed or supported by Microsoft

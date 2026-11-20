@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use windows::Win32::System::Registry::HKEY_CURRENT_USER;
 
 use crate::cmd::{PaneMode, SortCol, ViewMode};
+use crate::i18n::Lang;
 use crate::theme::ThemeChoice;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -55,6 +56,9 @@ pub struct Settings {
     pub restore_tabs: bool,
     pub last_tabs: Vec<String>,
     pub show_about_on_start: bool,
+    /// None - язык ещё не выбран, при запуске будет вопрос
+    pub language: Option<Lang>,
+    pub check_updates: bool,
 }
 
 impl Default for Settings {
@@ -83,6 +87,8 @@ impl Default for Settings {
             restore_tabs: false,
             last_tabs: vec![],
             show_about_on_start: true,
+            language: None,
+            check_updates: true,
         }
     }
 }
@@ -99,9 +105,33 @@ impl Settings {
                 if let Ok(v) = serde_json::from_str::<Settings>(&s) {
                     return v;
                 }
+                if let Some(v) = Self::salvage(&s) {
+                    return v;
+                }
             }
         }
         Self::from_explorer()
+    }
+
+    /// Файл не читается целиком (например, его записала другая версия Oxide):
+    /// берём каждое поле, которое читается, остальные - по умолчанию. Так настройки
+    /// пользователя не сбрасываются из-за одного незнакомого значения
+    fn salvage(text: &str) -> Option<Self> {
+        let serde_json::Value::Object(saved) = serde_json::from_str::<serde_json::Value>(text).ok()? else { return None };
+        let serde_json::Value::Object(mut acc) = serde_json::to_value(Self::from_explorer()).ok()? else { return None };
+        for (k, v) in saved {
+            if !acc.contains_key(&k) {
+                continue;
+            }
+            let mut probe = acc.clone();
+            probe.insert(k.clone(), v.clone());
+            if serde_json::from_value::<Settings>(serde_json::Value::Object(probe)).is_ok() {
+                acc.insert(k, v);
+            }
+        }
+        let f = file()?;
+        let _ = std::fs::copy(&f, f.with_extension("json.bak"));
+        serde_json::from_value(serde_json::Value::Object(acc)).ok()
     }
 
     /// Начальные значения из настроек Проводника Windows

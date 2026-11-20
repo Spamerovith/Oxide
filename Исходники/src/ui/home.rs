@@ -1,5 +1,8 @@
 //! Страницы «Главная» (Быстрый доступ + Последние) и «Этот компьютер» (диски)
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use std::cell::RefCell;
 use std::path::PathBuf;
 
@@ -139,18 +142,18 @@ fn section(app: &OxideApp, ui: &mut Ui, title: &'static str) -> bool {
 
 fn folder_menu(app: &mut OxideApp, ctx: &egui::Context, p: PathBuf, pinned: bool, pos: Pos2) {
     let mut items = vec![
-        MenuItem::new("Открыть", Cmd::Navigate(p.clone())).icon(ICON_OPEN),
-        MenuItem::new("Открыть в новой вкладке", Cmd::OpenInNewTabPath(p.clone())).icon(ICON_ADD),
-        MenuItem::new("Открыть в новом окне", Cmd::OpenInNewWindowPath(p.clone())).icon(ICON_NEW_WINDOW),
+        MenuItem::new(tr("Открыть"), Cmd::Navigate(p.clone())).icon(ICON_OPEN),
+        MenuItem::new(tr("Открыть в новой вкладке"), Cmd::OpenInNewTabPath(p.clone())).icon(ICON_ADD),
+        MenuItem::new(tr("Открыть в новом окне"), Cmd::OpenInNewWindowPath(p.clone())).icon(ICON_NEW_WINDOW),
         MenuItem::sep(),
     ];
     if pinned {
-        items.push(MenuItem::new("Открепить от панели быстрого доступа", Cmd::UnpinPath(p.clone())).icon(ICON_UNPIN));
+        items.push(MenuItem::new(tr("Открепить от панели быстрого доступа"), Cmd::UnpinPath(p.clone())).icon(ICON_UNPIN));
     } else {
-        items.push(MenuItem::new("Закрепить на панели быстрого доступа", Cmd::PinPath(p.clone())).icon(ICON_PIN));
+        items.push(MenuItem::new(tr("Закрепить на панели быстрого доступа"), Cmd::PinPath(p.clone())).icon(ICON_PIN));
     }
-    items.push(MenuItem::new("Копировать как путь", Cmd::CopyPathOf(p.clone())).icon(ICON_LINK));
-    items.push(MenuItem::new("Свойства", Cmd::PropertiesOf(p)).icon(ICON_PROPERTIES));
+    items.push(MenuItem::new(tr("Копировать как путь"), Cmd::CopyPathOf(p.clone())).icon(ICON_LINK));
+    items.push(MenuItem::new(tr("Свойства"), Cmd::PropertiesOf(p)).icon(ICON_PROPERTIES));
     let id = app.new_popup_id();
     app.open_popup(Popup::new(id, pos, items, now(ctx)));
 }
@@ -171,7 +174,7 @@ pub fn home(app: &mut OxideApp, ui: &mut Ui) {
             ui.add_space(margin);
             ui.vertical(|ui| {
                 ui.set_width(ui.available_width() - margin);
-                if section(app, ui, "Быстрый доступ") {
+                if section(app, ui, tr("Быстрый доступ")) {
                     let quick = app.quick.clone();
                     let tile = Vec2::new(236.0, 64.0);
                     let w = ui.available_width();
@@ -219,7 +222,7 @@ pub fn home(app: &mut OxideApp, ui: &mut Ui) {
                     }
                     ui.add_space(12.0);
                 }
-                if app.settings.show_recent && section(app, ui, "Последние") {
+                if app.settings.show_recent && section(app, ui, tr("Последние")) {
                     let recent = app.recent.clone();
                     let w = ui.available_width();
                     let c_name = (w * 0.45).max(220.0);
@@ -227,12 +230,12 @@ pub fn home(app: &mut OxideApp, ui: &mut Ui) {
                     // Заголовки
                     let (hr, _) = ui.allocate_exact_size(Vec2::new(w, m::HEADER_H), Sense::hover());
                     let cy = hr.center().y;
-                    ui.painter().text(Pos2::new(hr.left() + 12.0, cy), Align2::LEFT_CENTER, "Имя", font(12.0), pal.text2);
-                    ui.painter().text(Pos2::new(hr.left() + c_name, cy), Align2::LEFT_CENTER, "Дата открытия", font(12.0), pal.text2);
-                    ui.painter().text(Pos2::new(hr.left() + c_name + c_date, cy), Align2::LEFT_CENTER, "Расположение", font(12.0), pal.text2);
+                    ui.painter().text(Pos2::new(hr.left() + 12.0, cy), Align2::LEFT_CENTER, tr("Имя"), font(12.0), pal.text2);
+                    ui.painter().text(Pos2::new(hr.left() + c_name, cy), Align2::LEFT_CENTER, tr("Дата открытия"), font(12.0), pal.text2);
+                    ui.painter().text(Pos2::new(hr.left() + c_name + c_date, cy), Align2::LEFT_CENTER, tr("Расположение"), font(12.0), pal.text2);
                     if recent.is_empty() {
                         ui.add_space(8.0);
-                        ui.label(egui::RichText::new("Здесь появятся файлы, которые вы недавно открывали").font(font(12.0)).color(pal.text2));
+                        ui.label(egui::RichText::new(tr("Здесь появятся файлы, которые вы недавно открывали")).font(font(12.0)).color(pal.text2));
                     }
                     let row_h = if app.settings.compact { m::ROW_H_COMPACT } else { m::ROW_H };
                     for e in recent.iter() {
@@ -285,11 +288,11 @@ pub fn home(app: &mut OxideApp, ui: &mut Ui) {
     }
     if let Some((p, pos)) = file_menu {
         let items = vec![
-            MenuItem::new("Открыть", Cmd::OpenParsing(p.to_string_lossy().to_string())).icon(ICON_OPEN),
-            MenuItem::new("Открыть расположение файла", Cmd::Navigate(p.clone())).icon(ICON_FOLDER),
+            MenuItem::new(tr("Открыть"), Cmd::OpenParsing(p.to_string_lossy().to_string())).icon(ICON_OPEN),
+            MenuItem::new(tr("Открыть расположение файла"), Cmd::Navigate(p.clone())).icon(ICON_FOLDER),
             MenuItem::sep(),
-            MenuItem::new("Копировать как путь", Cmd::CopyPathOf(p.clone())).icon(ICON_LINK),
-            MenuItem::new("Свойства", Cmd::PropertiesOf(p)).icon(ICON_PROPERTIES),
+            MenuItem::new(tr("Копировать как путь"), Cmd::CopyPathOf(p.clone())).icon(ICON_LINK),
+            MenuItem::new(tr("Свойства"), Cmd::PropertiesOf(p)).icon(ICON_PROPERTIES),
         ];
         let id = app.new_popup_id();
         app.open_popup(Popup::new(id, pos, items, now(&ctx)));
@@ -313,7 +316,7 @@ pub fn this_pc(app: &mut OxideApp, ui: &mut Ui) {
                 let drives = app.drives.clone();
                 let local: Vec<_> = drives.iter().filter(|d| d.kind != fs::DRIVE_REMOTE).cloned().collect();
                 let remote: Vec<_> = drives.iter().filter(|d| d.kind == fs::DRIVE_REMOTE).cloned().collect();
-                for (title, list) in [("Устройства и диски", local), ("Сетевые расположения", remote)] {
+                for (title, list) in [(tr("Устройства и диски"), local), (tr("Сетевые расположения"), remote)] {
                     if list.is_empty() {
                         continue;
                     }
@@ -352,7 +355,7 @@ pub fn this_pc(app: &mut OxideApp, ui: &mut Ui) {
                             let frac = 1.0 - d.free as f32 / d.total as f32;
                             let bar = Rect::from_min_size(Pos2::new(tx, r.top() + 34.0), Vec2::new(tw, 4.0));
                             usage_bar(ui.painter(), bar, frac, &pal);
-                            let txt = format!("{} свободно из {}", crate::util::format_bytes(d.free), crate::util::format_bytes(d.total));
+                            let txt = trf("{} свободно из {}", &[&crate::util::format_bytes(d.free), &crate::util::format_bytes(d.total)]);
                             text_trunc(ui.painter(), Pos2::new(tx, r.top() + 54.0), &txt, font(12.0), pal.text2, tw);
                         }
                         if resp.clicked() {
@@ -380,13 +383,13 @@ pub fn this_pc(app: &mut OxideApp, ui: &mut Ui) {
     }
     if let Some((p, pos)) = menu {
         let items = vec![
-            MenuItem::new("Открыть", Cmd::Navigate(p.clone())).icon(ICON_OPEN),
-            MenuItem::new("Открыть в новой вкладке", Cmd::OpenInNewTabPath(p.clone())).icon(ICON_ADD),
-            MenuItem::new("Открыть в новом окне", Cmd::OpenInNewWindowPath(p.clone())).icon(ICON_NEW_WINDOW),
+            MenuItem::new(tr("Открыть"), Cmd::Navigate(p.clone())).icon(ICON_OPEN),
+            MenuItem::new(tr("Открыть в новой вкладке"), Cmd::OpenInNewTabPath(p.clone())).icon(ICON_ADD),
+            MenuItem::new(tr("Открыть в новом окне"), Cmd::OpenInNewWindowPath(p.clone())).icon(ICON_NEW_WINDOW),
             MenuItem::sep(),
-            MenuItem::new("Закрепить на панели быстрого доступа", Cmd::PinPath(p.clone())).icon(ICON_PIN),
-            MenuItem::new("Копировать как путь", Cmd::CopyPathOf(p.clone())).icon(ICON_LINK),
-            MenuItem::new("Свойства", Cmd::PropertiesOf(p)).icon(ICON_PROPERTIES),
+            MenuItem::new(tr("Закрепить на панели быстрого доступа"), Cmd::PinPath(p.clone())).icon(ICON_PIN),
+            MenuItem::new(tr("Копировать как путь"), Cmd::CopyPathOf(p.clone())).icon(ICON_LINK),
+            MenuItem::new(tr("Свойства"), Cmd::PropertiesOf(p)).icon(ICON_PROPERTIES),
         ];
         let id = app.new_popup_id();
         app.open_popup(Popup::new(id, pos, items, now(&ctx)));

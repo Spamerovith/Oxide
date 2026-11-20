@@ -1,5 +1,8 @@
 //! Командная панель, как в Проводнике Windows 11
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use egui::{Id, Pos2, Rect, Ui, Vec2};
 
 use super::menu::Popup;
@@ -28,7 +31,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let mut x = rect.left() + 12.0;
 
     // «Создать»
-    let (r, br) = cmd_button(ui, x, cy, Id::new("cb-new"), Some((ICON_NEW, pal.text)), "Создать", true, &pal, writable, false);
+    let (r, br) = cmd_button(ui, x, cy, Id::new("cb-new"), Some((ICON_NEW, pal.text)), tr("Создать"), true, &pal, writable, false);
     if r.clicked() {
         let items = app.new_menu_items();
         let id = app.new_popup_id();
@@ -40,12 +43,12 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
 
     let paste_ok = writable && clipboard::has_files();
     let icons: [(char, Cmd, &str, bool); 6] = [
-        (ICON_CUT, Cmd::Cut, "Вырезать (Ctrl+X)", has_sel && listing),
-        (ICON_COPY, Cmd::Copy, "Копировать (Ctrl+C)", has_sel && listing),
-        (ICON_PASTE, Cmd::Paste, "Вставить (Ctrl+V)", paste_ok),
-        (ICON_RENAME, Cmd::Rename, "Переименовать (F2)", single && !virt),
-        (ICON_SHARE, Cmd::Share, "Поделиться", has_sel && !virt),
-        (ICON_DELETE, Cmd::Delete, "Удалить (Delete)", has_sel && listing),
+        (ICON_CUT, Cmd::Cut, tr("Вырезать (Ctrl+X)"), has_sel && listing),
+        (ICON_COPY, Cmd::Copy, tr("Копировать (Ctrl+C)"), has_sel && listing),
+        (ICON_PASTE, Cmd::Paste, tr("Вставить (Ctrl+V)"), paste_ok),
+        (ICON_RENAME, Cmd::Rename, tr("Переименовать (F2)"), single && !virt),
+        (ICON_SHARE, Cmd::Share, tr("Поделиться"), has_sel && !virt),
+        (ICON_DELETE, Cmd::Delete, tr("Удалить (Delete)"), has_sel && listing),
     ];
     for (i, (ic, c, tip, en)) in icons.iter().enumerate() {
         let r = Rect::from_min_size(Pos2::new(x, cy - m::BTN_H / 2.0), Vec2::new(m::NAV_BTN_W, m::BTN_H));
@@ -59,14 +62,14 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     vsep(ui.painter(), x, cy, 24.0, &pal);
     x += 12.0;
 
-    let (r, br) = cmd_button(ui, x, cy, Id::new("cb-sort"), Some((ICON_SORT, pal.accent)), "Сортировать", true, &pal, listing, false);
+    let (r, br) = cmd_button(ui, x, cy, Id::new("cb-sort"), Some((ICON_SORT, pal.accent)), tr("Сортировать"), true, &pal, listing, false);
     if r.clicked() {
         let items = app.sort_menu_items();
         let id = app.new_popup_id();
         app.open_popup(Popup::below(id, br, items, now(&ctx)));
     }
     x = br.right() + 8.0;
-    let (r, br) = cmd_button(ui, x, cy, Id::new("cb-view"), Some((ICON_VIEW, pal.text)), "Просмотреть", true, &pal, true, false);
+    let (r, br) = cmd_button(ui, x, cy, Id::new("cb-view"), Some((ICON_VIEW, pal.text)), tr("Просмотреть"), true, &pal, true, false);
     if r.clicked() {
         let items = app.view_menu_items();
         let id = app.new_popup_id();
@@ -76,7 +79,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     if is_bin {
         vsep(ui.painter(), x, cy, 24.0, &pal);
         x += 12.0;
-        let (r, br) = cmd_button(ui, x, cy, Id::new("cb-emptybin"), Some((ICON_DELETE, pal.text)), "Очистить корзину", false, &pal, true, false);
+        let (r, br) = cmd_button(ui, x, cy, Id::new("cb-emptybin"), Some((ICON_DELETE, pal.text)), tr("Очистить корзину"), false, &pal, true, false);
         if r.clicked() {
             cmd = Some(Cmd::EmptyRecycleBin);
         }
@@ -85,7 +88,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     vsep(ui.painter(), x, cy, 24.0, &pal);
     x += 12.0;
     let r = Rect::from_min_size(Pos2::new(x, cy - m::BTN_H / 2.0), Vec2::new(m::NAV_BTN_W, m::BTN_H));
-    let resp = icon_button(ui, r, Id::new("cb-more"), ICON_MORE, 16.0, &pal, true, "Подробнее");
+    let resp = icon_button(ui, r, Id::new("cb-more"), ICON_MORE, 16.0, &pal, true, tr("Подробнее"));
     if resp.clicked() {
         let items = app.more_menu_items();
         let id = app.new_popup_id();
@@ -93,7 +96,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     }
 
     // «Сведения» справа
-    let label = "Сведения";
+    let label = tr("Сведения");
     let w = 12.0 + 16.0 + 8.0 + text_width(ui, label, font(14.0)) + 12.0;
     let sx = rect.right() - 16.0 - w;
     if sx > x + m::NAV_BTN_W + 8.0 {
@@ -102,7 +105,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
         if r.clicked() {
             cmd = Some(Cmd::Pane(PaneMode::Details));
         }
-        let _ = r.on_hover_text("Область сведений (Alt+Shift+P)");
+        let _ = r.on_hover_text(tr("Область сведений (Alt+Shift+P)"));
     }
     if let Some(c) = cmd {
         app.exec(&ctx, c);

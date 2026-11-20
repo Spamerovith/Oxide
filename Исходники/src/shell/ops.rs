@@ -1,6 +1,9 @@
 //! Файловые операции через IFileOperation (родные диалоги прогресса, конфликтов, UAC, Корзина)
 //! в отдельном STA-потоке, чтобы окно не зависало
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender};
 
@@ -139,7 +142,7 @@ unsafe fn perform(op: &Op) -> Result<bool, String> {
 
 /// Создание папки (синхронно - мгновенная операция)
 pub fn create_folder(dir: &Path) -> Result<PathBuf, String> {
-    let p = super::fs::unique_name(dir, "Новая папка", "");
+    let p = super::fs::unique_name(dir, tr("Новая папка"), "");
     std::fs::create_dir(super::fs::long_path(&p)).map_err(|e| e.to_string())?;
     Ok(p)
 }
@@ -240,7 +243,7 @@ pub fn create_new_item(dir: &Path, it: &NewItem) -> Result<PathBuf, String> {
 }
 
 pub fn create_text_file(dir: &Path) -> Result<PathBuf, String> {
-    let p = super::fs::unique_name(dir, "Текстовый документ", ".txt");
+    let p = super::fs::unique_name(dir, tr("Текстовый документ"), ".txt");
     std::fs::write(&p, []).map_err(|e| e.to_string())?;
     Ok(p)
 }

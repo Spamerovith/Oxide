@@ -1,5 +1,8 @@
 //! Состояние приложения, вкладки, навигация, фоновые задачи и выполнение команд
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -256,6 +259,10 @@ pub enum Dialog {
     Settings,
     Message { title: String, text: String },
     About,
+    /// Выбор языка при первом запуске
+    Language,
+    /// Предложение установить новую версию
+    Update(crate::update::Release),
 }
 
 pub enum UndoRec {
@@ -277,6 +284,7 @@ pub struct NavState {
 
 pub struct OxideApp {
     pub settings: Settings,
+    pub updater: crate::update::Updater,
     pub pal: Palette,
     pub system_dark: bool,
     pub accent: Option<[egui::Color32; 8]>,
@@ -397,6 +405,7 @@ impl OxideApp {
             fs_dirty_all: false,
             last_menu_pos: None,
             undo_pop_after: false,
+            updater: crate::update::Updater::new(),
             settings,
         };
         app.refresh_drives(&ctx);
@@ -404,6 +413,9 @@ impl OxideApp {
 
         // Стартовое расположение
         let mut select_file: Option<PathBuf> = None;
+        // Перезапуск после обновления: вернуть все вкладки, как были
+        let after_update = start.as_deref() == Some(crate::update::AFTER_UPDATE_ARG);
+        let start = if after_update { None } else { start };
         let loc = match start {
             Some(a) if !a.is_empty() => {
                 let a = a.trim_matches('"').to_string();
@@ -421,17 +433,26 @@ impl OxideApp {
             }
             _ => app.default_location(),
         };
-        if app.settings.restore_tabs && select_file.is_none() && !app.settings.last_tabs.is_empty() {
+        if (app.settings.restore_tabs || after_update) && select_file.is_none() && !app.settings.last_tabs.is_empty() {
             let tabs = app.settings.last_tabs.clone();
+            // Каждую следующую вкладку - правее предыдущей, порядок как был
             for t in tabs {
                 app.open_tab(&ctx, Location::from_arg(&t), false);
+                app.active = app.tabs.len() - 1;
             }
             app.active = 0;
         } else {
             app.open_tab(&ctx, loc, true);
         }
-        if app.settings.show_about_on_start {
+        if app.settings.language.is_none() {
+            app.dialog = Some(Dialog::Language);
+        } else if app.settings.show_about_on_start && !after_update {
             app.dialog = Some(Dialog::About);
+        }
+        if after_update {
+            let v = env!("CARGO_PKG_VERSION");
+            let text = if crate::i18n::is_en() { format!("Oxide has been updated to version {v}") } else { format!("Oxide обновлён до версии {v}") };
+            app.toast = Some((text, now(&ctx)));
         }
         if let Some(f) = select_file {
             app.tabs[app.active].reselect = Some(vec![f]);
@@ -459,6 +480,27 @@ impl OxideApp {
 
     pub fn mark_settings(&mut self, ctx: &egui::Context) {
         self.settings_dirty = Some(now(ctx));
+    }
+
+    /// Сменить язык интерфейса сразу, без перезапуска
+    pub fn set_language(&mut self, ctx: &egui::Context, lang: crate::i18n::Lang) {
+        self.settings.language = Some(lang);
+        crate::i18n::set(lang);
+        for t in &mut self.tabs {
+            t.title = Self::title_of(&t.loc);
+        }
+        self.refresh_drives(ctx);
+        self.mark_settings(ctx);
+        ctx.request_repaint();
+    }
+
+    /// Обновление скачано и установлено: сохранить всё и запустить новую версию
+    fn finish_update(&mut self, ctx: &egui::Context) {
+        self.save_window(ctx);
+        self.settings.save();
+        self.settings_dirty = None;
+        crate::update::restart();
+        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
     }
 
     // ---------- Вкладки ----------
@@ -548,8 +590,8 @@ impl OxideApp {
 
     pub fn title_of(loc: &Location) -> String {
         match loc {
-            Location::Home => "Главная".into(),
-            Location::ThisPc => "Этот компьютер".into(),
+            Location::Home => tr("Главная").into(),
+            Location::ThisPc => tr("Этот компьютер").into(),
             Location::Path(p) => {
                 if p.parent().is_none() || p.to_string_lossy().ends_with(":\\") || p.to_string_lossy().len() <= 3 {
                     fs::shell_display_name(p).unwrap_or_else(|| p.to_string_lossy().to_string())
@@ -847,7 +889,7 @@ impl OxideApp {
         // Завершённые файловые операции
         while let Ok(done) = self.ops.rx.try_recv() {
             if let Some(err) = done.error {
-                self.dialog = Some(Dialog::Message { title: "Не удалось выполнить операцию".into(), text: err });
+                self.dialog = Some(Dialog::Message { title: tr("Не удалось выполнить операцию").into(), text: err });
             } else if done.ok && std::mem::take(&mut self.undo_pop_after) {
                 // Это была отмена - новую запись отмены не создаём
             } else if done.ok {
@@ -1024,7 +1066,7 @@ impl OxideApp {
         }
         let target = e.shell.clone().unwrap_or_else(|| e.path.to_string_lossy().to_string());
         if !smenu::open(&target) {
-            self.toast = Some((format!("Не удаётся открыть «{}»", e.display), now(ctx)));
+            self.toast = Some((trf("Не удаётся открыть «{}»", &[&e.display]), now(ctx)));
         }
     }
 
@@ -1058,7 +1100,7 @@ impl OxideApp {
                 self.ops.run(Op::Copy { src: files, dst: dir });
             }
         } else {
-            self.toast = Some(("В буфере обмена нет файлов".into(), now(ctx)));
+            self.toast = Some((tr("В буфере обмена нет файлов").into(), now(ctx)));
         }
     }
 
@@ -1084,7 +1126,7 @@ impl OxideApp {
         }
         if let Some(c) = crate::util::invalid_name_char(&new) {
             let _ = c;
-            self.tabs[a].rename = Some(Rename { error: Some("Имя файла не должно содержать следующих знаков: \\ / : * ? \" < > |".into()), ..r });
+            self.tabs[a].rename = Some(Rename { error: Some(tr("Имя файла не должно содержать следующих знаков: \\ / : * ? \" < > |").into()), ..r });
             return;
         }
         self.ops.run(Op::Rename { path: e.path.clone(), new_name: new.clone() });
@@ -1126,13 +1168,13 @@ impl OxideApp {
                 self.tabs[a].rename_after_load = Some(p);
                 self.reload_keep(ctx, a);
             }
-            Err(e) => self.dialog = Some(Dialog::Message { title: "Не удалось создать папку".into(), text: e }),
+            Err(e) => self.dialog = Some(Dialog::Message { title: tr("Не удалось создать папку").into(), text: e }),
         }
     }
 
     pub fn undo_last(&mut self, ctx: &egui::Context) {
         let Some(u) = self.undo.pop() else {
-            self.toast = Some(("Нечего отменять".into(), now(ctx)));
+            self.toast = Some((tr("Нечего отменять").into(), now(ctx)));
             return;
         };
         match u {
@@ -1211,7 +1253,7 @@ impl OxideApp {
             Cmd::Share => {
                 let names = self.tab().selected_names();
                 if !names.is_empty() && !smenu::invoke_verb(&names, "Windows.ModernShare") {
-                    self.toast = Some(("Общий доступ для этих элементов недоступен".into(), now(ctx)));
+                    self.toast = Some((tr("Общий доступ для этих элементов недоступен").into(), now(ctx)));
                 }
             }
             Cmd::Properties => {
@@ -1262,9 +1304,9 @@ impl OxideApp {
                     return;
                 }
                 let base = if paths.len() == 1 {
-                    paths[0].file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Архив".into())
+                    paths[0].file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| tr("Архив").into())
                 } else {
-                    dir.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Архив".into())
+                    dir.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| tr("Архив").into())
                 };
                 let out = fs::unique_name(&dir, &base, ".zip");
                 let tx = self.tx.clone();
@@ -1274,7 +1316,7 @@ impl OxideApp {
                     let r = crate::shell::ops::compress_zip(&paths, &out);
                     if let Err(e) = r {
                         let _ = std::fs::remove_file(&out);
-                        let _ = tx.send(Msg::Toast(format!("Не удалось создать ZIP: {e}")));
+                        let _ = tx.send(Msg::Toast(trf("Не удалось создать ZIP: {}", &[&e])));
                     }
                     let _ = tx.send(Msg::RefreshAll);
                     c.request_repaint();
@@ -1287,10 +1329,10 @@ impl OxideApp {
                 std::thread::spawn(move || {
                     for z in paths {
                         let dir = z.parent().map(|p| p.to_path_buf()).unwrap_or_default();
-                        let stem = z.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "Архив".into());
+                        let stem = z.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| tr("Архив").into());
                         let dest = fs::unique_name(&dir, &stem, "");
                         if let Err(e) = crate::shell::ops::extract_zip(&z, &dest) {
-                            let _ = tx.send(Msg::Toast(format!("Не удалось извлечь: {e}")));
+                            let _ = tx.send(Msg::Toast(trf("Не удалось извлечь: {}", &[&e])));
                         }
                     }
                     let _ = tx.send(Msg::RefreshAll);
@@ -1319,7 +1361,7 @@ impl OxideApp {
                             self.tabs[a].rename_after_load = Some(p);
                             self.reload_keep(ctx, a);
                         }
-                        Err(e) => self.dialog = Some(Dialog::Message { title: "Не удалось создать файл".into(), text: e }),
+                        Err(e) => self.dialog = Some(Dialog::Message { title: tr("Не удалось создать файл").into(), text: e }),
                     }
                 }
             }
@@ -1503,7 +1545,7 @@ impl OxideApp {
 
     pub fn new_menu_items(&mut self) -> Vec<MenuItem> {
         self.ensure_new_items();
-        let mut v = vec![MenuItem::new("Папку", Cmd::NewFolder).sys("<dir>".into(), std::env::var("WINDIR").unwrap_or_else(|_| r"C:\Windows".into())).key("Ctrl+Shift+N")];
+        let mut v = vec![MenuItem::new(tr("Папку"), Cmd::NewFolder).sys("<dir>".into(), std::env::var("WINDIR").unwrap_or_else(|_| r"C:\Windows".into())).key("Ctrl+Shift+N")];
         let items = self.new_items.clone().unwrap_or_default();
         if !items.is_empty() {
             v.push(MenuItem::sep());
@@ -1523,8 +1565,8 @@ impl OxideApp {
         }
         let mut v: Vec<MenuItem> = cols.into_iter().map(|c| MenuItem::new(c.title(), Cmd::SortBy(c)).radio(t.view.sort == c)).collect();
         v.push(MenuItem::sep());
-        v.push(MenuItem::new("По возрастанию", Cmd::SortAsc).radio(!t.view.desc));
-        v.push(MenuItem::new("По убыванию", Cmd::SortDesc).radio(t.view.desc));
+        v.push(MenuItem::new(tr("По возрастанию"), Cmd::SortAsc).radio(!t.view.desc));
+        v.push(MenuItem::new(tr("По убыванию"), Cmd::SortDesc).radio(t.view.desc));
         v
     }
 
@@ -1535,16 +1577,16 @@ impl OxideApp {
             .map(|&m| MenuItem::new(m.title(), Cmd::View(m)).icon(m.icon()).key(m.shortcut()).radio(t.view.view == m))
             .collect();
         v.push(MenuItem::sep());
-        v.push(MenuItem::new("Компактный вид", Cmd::ToggleCompact).checked(self.settings.compact));
+        v.push(MenuItem::new(tr("Компактный вид"), Cmd::ToggleCompact).checked(self.settings.compact));
         v.push(MenuItem::submenu(
-            "Показать",
+            tr("Показать"),
             vec![
-                MenuItem::new("Область сведений", Cmd::Pane(PaneMode::Details)).key("Alt+Shift+P").checked(self.settings.pane == PaneMode::Details),
-                MenuItem::new("Область просмотра", Cmd::Pane(PaneMode::Preview)).key("Alt+P").checked(self.settings.pane == PaneMode::Preview),
+                MenuItem::new(tr("Область сведений"), Cmd::Pane(PaneMode::Details)).key("Alt+Shift+P").checked(self.settings.pane == PaneMode::Details),
+                MenuItem::new(tr("Область просмотра"), Cmd::Pane(PaneMode::Preview)).key("Alt+P").checked(self.settings.pane == PaneMode::Preview),
                 MenuItem::sep(),
-                MenuItem::new("Флажки элементов", Cmd::ToggleCheckboxes).checked(self.settings.checkboxes),
-                MenuItem::new("Расширения имён файлов", Cmd::ToggleExt).checked(self.settings.show_ext),
-                MenuItem::new("Скрытые элементы", Cmd::ToggleHidden).checked(self.settings.show_hidden),
+                MenuItem::new(tr("Флажки элементов"), Cmd::ToggleCheckboxes).checked(self.settings.checkboxes),
+                MenuItem::new(tr("Расширения имён файлов"), Cmd::ToggleExt).checked(self.settings.show_ext),
+                MenuItem::new(tr("Скрытые элементы"), Cmd::ToggleHidden).checked(self.settings.show_hidden),
             ],
         ).icon(ICON_SHOW));
         v
@@ -1554,21 +1596,21 @@ impl OxideApp {
         let t = self.tab();
         let has_sel = t.sel_count() > 0;
         let mut v = vec![
-            MenuItem::new("Отменить", Cmd::Undo).icon(ICON_UNDO).key("Ctrl+Z").enabled(!self.undo.is_empty()),
-            MenuItem::new("Закрепить на панели быстрого доступа", Cmd::PinHome).icon(ICON_PIN).enabled(t.fs_dir().is_some()),
+            MenuItem::new(tr("Отменить"), Cmd::Undo).icon(ICON_UNDO).key("Ctrl+Z").enabled(!self.undo.is_empty()),
+            MenuItem::new(tr("Закрепить на панели быстрого доступа"), Cmd::PinHome).icon(ICON_PIN).enabled(t.fs_dir().is_some()),
             MenuItem::sep(),
-            MenuItem::new("Выделить все", Cmd::SelectAll).icon(ICON_SELECT_ALL).key("Ctrl+A").enabled(!t.entries.is_empty()),
-            MenuItem::new("Снять выделение", Cmd::SelectNone).icon(ICON_SELECT_NONE).enabled(has_sel),
-            MenuItem::new("Обратить выделение", Cmd::InvertSelection).icon(ICON_SELECT_NONE).enabled(!t.entries.is_empty()),
+            MenuItem::new(tr("Выделить все"), Cmd::SelectAll).icon(ICON_SELECT_ALL).key("Ctrl+A").enabled(!t.entries.is_empty()),
+            MenuItem::new(tr("Снять выделение"), Cmd::SelectNone).icon(ICON_SELECT_NONE).enabled(has_sel),
+            MenuItem::new(tr("Обратить выделение"), Cmd::InvertSelection).icon(ICON_SELECT_NONE).enabled(!t.entries.is_empty()),
             MenuItem::sep(),
         ];
         if matches!(&t.loc, Location::Shell(s) if s.eq_ignore_ascii_case(shellfolder::RECYCLE_BIN)) {
-            v.push(MenuItem::new("Очистить корзину", Cmd::EmptyRecycleBin).icon(ICON_DELETE));
+            v.push(MenuItem::new(tr("Очистить корзину"), Cmd::EmptyRecycleBin).icon(ICON_DELETE));
         }
-        v.push(MenuItem::new("Открыть в Терминале", Cmd::OpenTerminal).icon(ICON_TERMINAL).enabled(t.fs_dir().is_some()));
-        v.push(MenuItem::new("Свойства", Cmd::Properties).icon(ICON_PROPERTIES).key("Alt+Enter"));
-        v.push(MenuItem::new("Параметры", Cmd::Options).icon(ICON_SETTINGS));
-        v.push(MenuItem::new("О программе Oxide", Cmd::About).icon(ICON_INFO));
+        v.push(MenuItem::new(tr("Открыть в Терминале"), Cmd::OpenTerminal).icon(ICON_TERMINAL).enabled(t.fs_dir().is_some()));
+        v.push(MenuItem::new(tr("Свойства"), Cmd::Properties).icon(ICON_PROPERTIES).key("Alt+Enter"));
+        v.push(MenuItem::new(tr("Параметры"), Cmd::Options).icon(ICON_SETTINGS));
+        v.push(MenuItem::new(tr("О программе Oxide"), Cmd::About).icon(ICON_INFO));
         v
     }
 
@@ -1581,16 +1623,16 @@ impl OxideApp {
         let all_dirs = ents.iter().all(|e| e.is_dir);
         let first = ents.first().cloned();
         let mut items = vec![];
-        items.push(MenuItem::new("Открыть", Cmd::Open).icon(ICON_OPEN).key("Enter"));
+        items.push(MenuItem::new(tr("Открыть"), Cmd::Open).icon(ICON_OPEN).key("Enter"));
         if all_dirs && !virt {
-            items.push(MenuItem::new("Открыть в новой вкладке", Cmd::OpenNewTab).icon(ICON_ADD));
-            items.push(MenuItem::new("Открыть в новом окне", Cmd::OpenNewWindow).icon(ICON_NEW_WINDOW));
+            items.push(MenuItem::new(tr("Открыть в новой вкладке"), Cmd::OpenNewTab).icon(ICON_ADD));
+            items.push(MenuItem::new(tr("Открыть в новом окне"), Cmd::OpenNewWindow).icon(ICON_NEW_WINDOW));
         }
         if let Some(e) = &first {
             if single && !e.is_dir && !virt {
-                items.push(MenuItem::new("Открыть с помощью", Cmd::OpenWith).icon(ICON_OPEN_WITH));
+                items.push(MenuItem::new(tr("Открыть с помощью"), Cmd::OpenWith).icon(ICON_OPEN_WITH));
                 if matches!(e.ext.as_str(), "exe" | "bat" | "cmd" | "msi" | "ps1" | "lnk") {
-                    items.push(MenuItem::new("Запуск от имени администратора", Cmd::RunAsAdmin).icon(ICON_RUN_ADMIN));
+                    items.push(MenuItem::new(tr("Запуск от имени администратора"), Cmd::RunAsAdmin).icon(ICON_RUN_ADMIN));
                 }
             }
         }
@@ -1599,34 +1641,34 @@ impl OxideApp {
             if all_dirs {
                 let pinned = first.as_ref().map(|e| self.quick.iter().any(|q| q.2 && q.1 == e.path)).unwrap_or(false);
                 if pinned && single {
-                    items.push(MenuItem::new("Открепить от панели быстрого доступа", Cmd::UnpinHome).icon(ICON_UNPIN));
+                    items.push(MenuItem::new(tr("Открепить от панели быстрого доступа"), Cmd::UnpinHome).icon(ICON_UNPIN));
                 } else {
-                    items.push(MenuItem::new("Закрепить на панели быстрого доступа", Cmd::PinHome).icon(ICON_PIN));
+                    items.push(MenuItem::new(tr("Закрепить на панели быстрого доступа"), Cmd::PinHome).icon(ICON_PIN));
                 }
             }
             if let Some(e) = &first {
                 if single && e.ext == "zip" {
-                    items.push(MenuItem::new("Извлечь все...", Cmd::ExtractAll).icon(ICON_EXTRACT));
+                    items.push(MenuItem::new(tr("Извлечь все..."), Cmd::ExtractAll).icon(ICON_EXTRACT));
                 }
                 if single && matches!(e.ext.as_str(), "jpg" | "jpeg" | "png" | "bmp" | "gif" | "webp" | "jfif") {
-                    items.push(MenuItem::new("Сделать фоновым изображением рабочего стола", Cmd::SetWallpaper).icon(ICON_WALLPAPER));
+                    items.push(MenuItem::new(tr("Сделать фоновым изображением рабочего стола"), Cmd::SetWallpaper).icon(ICON_WALLPAPER));
                 }
             }
-            items.push(MenuItem::new("Сжать в ZIP-файл", Cmd::CompressZip).icon(ICON_ZIP));
-            items.push(MenuItem::new("Копировать как путь", Cmd::CopyPath).icon(ICON_LINK).key("Ctrl+Shift+C"));
+            items.push(MenuItem::new(tr("Сжать в ZIP-файл"), Cmd::CompressZip).icon(ICON_ZIP));
+            items.push(MenuItem::new(tr("Копировать как путь"), Cmd::CopyPath).icon(ICON_LINK).key("Ctrl+Shift+C"));
             if all_dirs && single {
-                items.push(MenuItem::new("Открыть в Терминале", Cmd::OpenTerminal).icon(ICON_TERMINAL));
+                items.push(MenuItem::new(tr("Открыть в Терминале"), Cmd::OpenTerminal).icon(ICON_TERMINAL));
             }
         }
-        items.push(MenuItem::new("Свойства", Cmd::Properties).icon(ICON_PROPERTIES).key("Alt+Enter"));
+        items.push(MenuItem::new(tr("Свойства"), Cmd::Properties).icon(ICON_PROPERTIES).key("Alt+Enter"));
         items.push(MenuItem::sep());
-        items.push(MenuItem::new("Показать дополнительные параметры", Cmd::MoreOptions).icon(ICON_MORE_OPTIONS).key("Shift+F10"));
+        items.push(MenuItem::new(tr("Показать дополнительные параметры"), Cmd::MoreOptions).icon(ICON_MORE_OPTIONS).key("Shift+F10"));
         let top = vec![
-            TopButton { icon: ICON_CUT, cmd: Cmd::Cut, tip: "Вырезать (Ctrl+X)".into(), enabled: true },
-            TopButton { icon: ICON_COPY, cmd: Cmd::Copy, tip: "Копировать (Ctrl+C)".into(), enabled: true },
-            TopButton { icon: ICON_RENAME, cmd: Cmd::Rename, tip: "Переименовать (F2)".into(), enabled: single && !virt },
-            TopButton { icon: ICON_SHARE, cmd: Cmd::Share, tip: "Поделиться".into(), enabled: !all_dirs },
-            TopButton { icon: ICON_DELETE, cmd: Cmd::Delete, tip: "Удалить (Delete)".into(), enabled: true },
+            TopButton { icon: ICON_CUT, cmd: Cmd::Cut, tip: tr("Вырезать (Ctrl+X)").into(), enabled: true },
+            TopButton { icon: ICON_COPY, cmd: Cmd::Copy, tip: tr("Копировать (Ctrl+C)").into(), enabled: true },
+            TopButton { icon: ICON_RENAME, cmd: Cmd::Rename, tip: tr("Переименовать (F2)").into(), enabled: single && !virt },
+            TopButton { icon: ICON_SHARE, cmd: Cmd::Share, tip: tr("Поделиться").into(), enabled: !all_dirs },
+            TopButton { icon: ICON_DELETE, cmd: Cmd::Delete, tip: tr("Удалить (Delete)").into(), enabled: true },
         ];
         let id = self.new_popup_id();
         self.last_menu_pos = Some(pos);
@@ -1638,28 +1680,28 @@ impl OxideApp {
         let virt = self.tab().is_virtual();
         let has_dir = self.tab().fs_dir().is_some() && !virt;
         let mut items = vec![
-            MenuItem::submenu("Вид", self.view_menu_items()).icon(ICON_V_M),
-            MenuItem::submenu("Сортировка", self.sort_menu_items()).icon(ICON_SORT),
+            MenuItem::submenu(tr("Вид"), self.view_menu_items()).icon(ICON_V_M),
+            MenuItem::submenu(tr("Сортировка"), self.sort_menu_items()).icon(ICON_SORT),
             MenuItem::sep(),
-            MenuItem::new("Обновить", Cmd::Refresh).icon(ICON_REFRESH).key("F5"),
+            MenuItem::new(tr("Обновить"), Cmd::Refresh).icon(ICON_REFRESH).key("F5"),
         ];
         if has_dir {
             items.push(MenuItem::sep());
-            items.push(MenuItem::new("Вставить", Cmd::Paste).icon(ICON_PASTE).key("Ctrl+V").enabled(clipboard::has_files()));
-            items.push(MenuItem::new("Отменить", Cmd::Undo).icon(ICON_UNDO).key("Ctrl+Z").enabled(!self.undo.is_empty()));
+            items.push(MenuItem::new(tr("Вставить"), Cmd::Paste).icon(ICON_PASTE).key("Ctrl+V").enabled(clipboard::has_files()));
+            items.push(MenuItem::new(tr("Отменить"), Cmd::Undo).icon(ICON_UNDO).key("Ctrl+Z").enabled(!self.undo.is_empty()));
             items.push(MenuItem::sep());
             let nm = self.new_menu_items();
-            items.push(MenuItem::submenu("Создать", nm).icon(ICON_NEW));
+            items.push(MenuItem::submenu(tr("Создать"), nm).icon(ICON_NEW));
             items.push(MenuItem::sep());
-            items.push(MenuItem::new("Открыть в Терминале", Cmd::OpenTerminal).icon(ICON_TERMINAL));
+            items.push(MenuItem::new(tr("Открыть в Терминале"), Cmd::OpenTerminal).icon(ICON_TERMINAL));
         }
         if matches!(&self.tab().loc, Location::Shell(s) if s.eq_ignore_ascii_case(shellfolder::RECYCLE_BIN)) {
             items.push(MenuItem::sep());
-            items.push(MenuItem::new("Очистить корзину", Cmd::EmptyRecycleBin).icon(ICON_DELETE));
+            items.push(MenuItem::new(tr("Очистить корзину"), Cmd::EmptyRecycleBin).icon(ICON_DELETE));
         }
-        items.push(MenuItem::new("Свойства", Cmd::Properties).icon(ICON_PROPERTIES).key("Alt+Enter"));
+        items.push(MenuItem::new(tr("Свойства"), Cmd::Properties).icon(ICON_PROPERTIES).key("Alt+Enter"));
         items.push(MenuItem::sep());
-        items.push(MenuItem::new("Показать дополнительные параметры", Cmd::MoreOptions).icon(ICON_MORE_OPTIONS).key("Shift+F10"));
+        items.push(MenuItem::new(tr("Показать дополнительные параметры"), Cmd::MoreOptions).icon(ICON_MORE_OPTIONS).key("Shift+F10"));
         let id = self.new_popup_id();
         self.last_menu_pos = Some(pos);
         Popup::new(id, pos, items, now(ctx))
@@ -1817,6 +1859,25 @@ impl eframe::App for OxideApp {
             }
         }
 
+        // Обновления: плановая проверка, предложение установить, перезапуск
+        self.updater.tick(ctx, self.settings.check_updates);
+        match self.updater.state() {
+            crate::update::State::Available(rel) if !self.updater.offered && self.dialog.is_none() && self.popup.is_none() => {
+                self.updater.offered = true;
+                self.dialog = Some(Dialog::Update(rel));
+            }
+            crate::update::State::Installed(_) => {
+                if self.updater.take_restart() {
+                    self.finish_update(ctx);
+                }
+            }
+            crate::update::State::Failed { text, rel: Some(_) } if self.dialog.is_none() => {
+                self.updater.dismiss_error();
+                self.dialog = Some(Dialog::Message { title: crate::i18n::l("Не удалось обновить Oxide", "Couldn't update Oxide").into(), text });
+            }
+            _ => {}
+        }
+
         ui::keys::handle(self, ctx);
         ui::frame(self, ctx);
 
@@ -1843,7 +1904,7 @@ impl eframe::App for OxideApp {
         self.handle_drops(ctx);
 
         // Заголовок окна = имя текущей папки (как в Проводнике)
-        let title = if self.tab().searching() { format!("Результаты поиска в «{}»", self.tab().title) } else { self.tab().title.clone() };
+        let title = if self.tab().searching() { trf("Результаты поиска в «{}»", &[&self.tab().title]) } else { self.tab().title.clone() };
         if title != self.last_title {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(format!("{title} - Oxide")));
             self.last_title = title;

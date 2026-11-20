@@ -1,6 +1,9 @@
 //! Область содержимого: таблица, значки (огромные…мелкие), список, плитка, содержимое
 //! Виртуализация: рисуются только видимые элементы, поэтому папки на 100 000 файлов не тормозят
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use egui::text::{LayoutJob, TextFormat, TextWrapping};
 use egui::emath::GuiRounding;
 use egui::{Align2, Color32, CornerRadius, Id, Key, Pos2, Rect, Sense, Stroke, StrokeKind, TextEdit, Ui, Vec2};
@@ -71,20 +74,20 @@ pub fn columns(app: &OxideApp) -> Vec<Col> {
     let w = app.settings.col_widths;
     let t = app.tab();
     let bin = matches!(&t.loc, crate::app::Location::Shell(s) if s.eq_ignore_ascii_case(shellfolder::RECYCLE_BIN));
-    let mut v = vec![Col { id: SortCol::Name, title: "Имя", w: w[0], slot: 0, right: false }];
+    let mut v = vec![Col { id: SortCol::Name, title: tr("Имя"), w: w[0], slot: 0, right: false }];
     if bin {
-        v.push(Col { id: SortCol::Location, title: "Исходное расположение", w: w[4], slot: 4, right: false });
-        v.push(Col { id: SortCol::Extra, title: "Дата удаления", w: w[5], slot: 5, right: false });
-        v.push(Col { id: SortCol::Size, title: "Размер", w: w[3], slot: 3, right: true });
-        v.push(Col { id: SortCol::Type, title: "Тип элемента", w: w[2], slot: 2, right: false });
+        v.push(Col { id: SortCol::Location, title: tr("Исходное расположение"), w: w[4], slot: 4, right: false });
+        v.push(Col { id: SortCol::Extra, title: tr("Дата удаления"), w: w[5], slot: 5, right: false });
+        v.push(Col { id: SortCol::Size, title: tr("Размер"), w: w[3], slot: 3, right: true });
+        v.push(Col { id: SortCol::Type, title: tr("Тип элемента"), w: w[2], slot: 2, right: false });
         return v;
     }
     if t.searching() {
-        v.push(Col { id: SortCol::Location, title: "Папка", w: w[4], slot: 4, right: false });
+        v.push(Col { id: SortCol::Location, title: tr("Папка"), w: w[4], slot: 4, right: false });
     }
-    v.push(Col { id: SortCol::Modified, title: "Дата изменения", w: w[1], slot: 1, right: false });
-    v.push(Col { id: SortCol::Type, title: "Тип", w: w[2], slot: 2, right: false });
-    v.push(Col { id: SortCol::Size, title: "Размер", w: w[3], slot: 3, right: true });
+    v.push(Col { id: SortCol::Modified, title: tr("Дата изменения"), w: w[1], slot: 1, right: false });
+    v.push(Col { id: SortCol::Type, title: tr("Тип"), w: w[2], slot: 2, right: false });
+    v.push(Col { id: SortCol::Size, title: tr("Размер"), w: w[3], slot: 3, right: true });
     v
 }
 
@@ -239,10 +242,10 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     if t.entries.is_empty() {
         if let Some(err) = t.error.clone() {
             let c = Pos2::new(area.center().x, area.top() + 80.0);
-            ui.painter().text(c, Align2::CENTER_CENTER, "Расположение недоступно", font_sb(14.0), pal.text);
+            ui.painter().text(c, Align2::CENTER_CENTER, tr("Расположение недоступно"), font_sb(14.0), pal.text);
             ui.painter().text(c + Vec2::new(0.0, 26.0), Align2::CENTER_CENTER, err, font(12.0), pal.text2);
             let br = Rect::from_center_size(c + Vec2::new(0.0, 70.0), Vec2::new(120.0, 32.0));
-            let resp = ui.scope_builder(egui::UiBuilder::new().max_rect(br), |ui| button(ui, "Повторить", true, &pal, 120.0)).inner;
+            let resp = ui.scope_builder(egui::UiBuilder::new().max_rect(br), |ui| button(ui, tr("Повторить"), true, &pal, 120.0)).inner;
             if resp.clicked() {
                 app.exec(&ctx, Cmd::Refresh);
             }
@@ -255,7 +258,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
             return;
         }
-        let msg = if t.searching() { "Нет элементов, удовлетворяющих условиям поиска" } else { "Эта папка пуста" };
+        let msg = if t.searching() { tr("Нет элементов, удовлетворяющих условиям поиска") } else { tr("Эта папка пуста") };
         ui.painter().text(Pos2::new(area.center().x, area.top() + 28.0), Align2::CENTER_CENTER, msg, font(12.0), pal.text2);
         let bg = ui.interact(area, Id::new(("empty-bg", t.id)), Sense::click());
         if bg.secondary_clicked() {
@@ -466,9 +469,9 @@ fn body(app: &mut OxideApp, ui: &mut Ui, lay: Lay, view: ViewMode) {
         }
         if hovered && !e.is_dir {
             let tip_type = e.type_name.clone().unwrap_or_else(|| fs::type_name(&e.ext, e.is_dir));
-            let mut tip = format!("Тип: {tip_type}\nРазмер: {}", crate::util::format_bytes(e.size));
+            let mut tip = trf("Тип: {}\nРазмер: {}", &[&tip_type, &crate::util::format_bytes(e.size)]);
             if e.mtime != 0 {
-                tip.push_str(&format!("\nДата изменения: {}", crate::util::format_filetime(e.mtime)));
+                tip.push_str(&trf("\nДата изменения: {}", &[&crate::util::format_filetime(e.mtime)]));
             }
             resp.on_hover_text(tip);
         }
@@ -663,10 +666,10 @@ fn paint_item(
             text_trunc(&p, Pos2::new(tx, cy + 11.0), &sub, font(12.0), pal.text2, hl.width() * 0.5);
             let rx = hl.right() - 16.0;
             if e.mtime != 0 {
-                text_right(&p, Pos2::new(rx, cy - 9.0), &format!("Дата изменения: {}", crate::util::format_filetime(e.mtime)), font(12.0), pal.text2);
+                text_right(&p, Pos2::new(rx, cy - 9.0), &trf("Дата изменения: {}", &[&crate::util::format_filetime(e.mtime)]), font(12.0), pal.text2);
             }
             if !e.is_dir {
-                text_right(&p, Pos2::new(rx, cy + 11.0), &format!("Размер: {}", crate::util::format_bytes(e.size)), font(12.0), pal.text2);
+                text_right(&p, Pos2::new(rx, cy + 11.0), &trf("Размер: {}", &[&crate::util::format_bytes(e.size)]), font(12.0), pal.text2);
             }
             Rect::from_min_max(Pos2::new(tx - 4.0, cy - 21.0), Pos2::new(tx + hl.width() * 0.5, cy + 3.0))
         }

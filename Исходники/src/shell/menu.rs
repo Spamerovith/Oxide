@@ -183,6 +183,23 @@ pub fn has_verb(names: &[String], verb: &str) -> bool {
     }
 }
 
+/// Открыть веб-страницу в браузере по умолчанию (только https)
+pub fn open_url(url: &str) -> bool {
+    if !url.starts_with("https://") {
+        return false;
+    }
+    let f = wide(url);
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+        fMask: SEE_MASK_NOASYNC,
+        hwnd: super::window::hwnd(),
+        lpFile: PCWSTR(f.as_ptr()),
+        nShow: SW_SHOWNORMAL.0,
+        ..Default::default()
+    };
+    unsafe { ShellExecuteExW(&mut info).is_ok() }
+}
+
 /// Открыть файл программой по умолчанию
 pub fn open(path: &str) -> bool {
     shell_execute(path, None, None)

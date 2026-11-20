@@ -1,5 +1,8 @@
 //! Общие помощники: строки UTF-16, реестр, форматирование дат/размеров, естественная сортировка
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use std::cmp::Ordering;
 use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
@@ -130,7 +133,7 @@ pub fn format_bytes(size: u64) -> String {
     let mut buf = [0u16; 64];
     unsafe {
         if StrFormatByteSizeEx(size, SFBS_FLAGS_ROUND_TO_NEAREST_DISPLAYED_DIGIT, &mut buf).is_err() {
-            return format!("{size} Б");
+            return trf("{} Б", &[&size]);
         }
     }
     from_wide(&buf)

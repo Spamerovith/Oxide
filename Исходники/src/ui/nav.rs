@@ -1,5 +1,8 @@
 //! Область навигации: Главная, Галерея, закреплённые папки, Этот компьютер, Сеть
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use std::path::PathBuf;
 
 use egui::{Color32, CornerRadius, Id, Pos2, Rect, Sense, Stroke, StrokeKind, Ui, Vec2};
@@ -59,10 +62,10 @@ fn push_children(app: &mut OxideApp, rows: &mut Vec<Row>, key: &str, path: &Path
 fn build(app: &mut OxideApp) -> Vec<Row> {
     let pal = app.pal.clone();
     let mut rows = vec![
-        Row { key: "home".into(), label: "Главная".into(), depth: 0, loc: Location::Home, icon: NIcon::Glyph(ICON_HOME, pal.accent), expandable: false, pinned: false, sep: false },
+        Row { key: "home".into(), label: tr("Главная").into(), depth: 0, loc: Location::Home, icon: NIcon::Glyph(ICON_HOME, pal.accent), expandable: false, pinned: false, sep: false },
         Row {
             key: "gallery".into(),
-            label: "Галерея".into(),
+            label: tr("Галерея").into(),
             depth: 0,
             loc: Location::Shell(shellfolder::GALLERY.into()),
             icon: NIcon::Glyph(ICON_GALLERY, pal.accent),
@@ -87,7 +90,7 @@ fn build(app: &mut OxideApp) -> Vec<Row> {
         push_children(app, &mut rows, &k, &p, 1);
     }
     rows.push(sep());
-    rows.push(Row { key: "thispc".into(), label: "Этот компьютер".into(), depth: 0, loc: Location::ThisPc, icon: NIcon::Glyph(ICON_PC, pal.accent), expandable: true, pinned: false, sep: false });
+    rows.push(Row { key: "thispc".into(), label: tr("Этот компьютер").into(), depth: 0, loc: Location::ThisPc, icon: NIcon::Glyph(ICON_PC, pal.accent), expandable: true, pinned: false, sep: false });
     if app.nav.expanded.contains("thispc") {
         let drives = app.drives.clone();
         for d in drives {
@@ -107,7 +110,7 @@ fn build(app: &mut OxideApp) -> Vec<Row> {
     }
     rows.push(Row {
         key: "network".into(),
-        label: "Сеть".into(),
+        label: tr("Сеть").into(),
         depth: 0,
         loc: Location::Shell(shellfolder::NETWORK.into()),
         icon: NIcon::Sys(shellfolder::NETWORK.into()),
@@ -117,7 +120,7 @@ fn build(app: &mut OxideApp) -> Vec<Row> {
     });
     rows.push(Row {
         key: "bin".into(),
-        label: "Корзина".into(),
+        label: tr("Корзина").into(),
         depth: 0,
         loc: Location::Shell(shellfolder::RECYCLE_BIN.into()),
         icon: NIcon::Sys(shellfolder::RECYCLE_BIN.into()),
@@ -260,24 +263,24 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
         let items = match &loc {
             Location::Path(p) => {
                 let mut v = vec![
-                    MenuItem::new("Открыть в новой вкладке", Cmd::OpenInNewTabPath(p.clone())).icon(ICON_ADD),
-                    MenuItem::new("Открыть в новом окне", Cmd::OpenInNewWindowPath(p.clone())).icon(ICON_NEW_WINDOW),
+                    MenuItem::new(tr("Открыть в новой вкладке"), Cmd::OpenInNewTabPath(p.clone())).icon(ICON_ADD),
+                    MenuItem::new(tr("Открыть в новом окне"), Cmd::OpenInNewWindowPath(p.clone())).icon(ICON_NEW_WINDOW),
                     MenuItem::sep(),
                 ];
                 if pinned {
-                    v.push(MenuItem::new("Открепить от панели быстрого доступа", Cmd::UnpinPath(p.clone())).icon(ICON_UNPIN));
+                    v.push(MenuItem::new(tr("Открепить от панели быстрого доступа"), Cmd::UnpinPath(p.clone())).icon(ICON_UNPIN));
                 } else {
-                    v.push(MenuItem::new("Закрепить на панели быстрого доступа", Cmd::PinPath(p.clone())).icon(ICON_PIN));
+                    v.push(MenuItem::new(tr("Закрепить на панели быстрого доступа"), Cmd::PinPath(p.clone())).icon(ICON_PIN));
                 }
-                v.push(MenuItem::new("Копировать как путь", Cmd::CopyPathOf(p.clone())).icon(ICON_LINK));
-                v.push(MenuItem::new("Свойства", Cmd::PropertiesOf(p.clone())).icon(ICON_PROPERTIES));
+                v.push(MenuItem::new(tr("Копировать как путь"), Cmd::CopyPathOf(p.clone())).icon(ICON_LINK));
+                v.push(MenuItem::new(tr("Свойства"), Cmd::PropertiesOf(p.clone())).icon(ICON_PROPERTIES));
                 v
             }
             Location::Shell(s) if s.eq_ignore_ascii_case(shellfolder::RECYCLE_BIN) => vec![
-                MenuItem::new("Открыть", Cmd::NavigateShell(s.clone())).icon(ICON_OPEN),
-                MenuItem::new("Очистить корзину", Cmd::EmptyRecycleBin).icon(ICON_DELETE),
+                MenuItem::new(tr("Открыть"), Cmd::NavigateShell(s.clone())).icon(ICON_OPEN),
+                MenuItem::new(tr("Очистить корзину"), Cmd::EmptyRecycleBin).icon(ICON_DELETE),
             ],
-            Location::Home => vec![MenuItem::new("Открыть в новой вкладке", Cmd::NewTab).icon(ICON_ADD)],
+            Location::Home => vec![MenuItem::new(tr("Открыть в новой вкладке"), Cmd::NewTab).icon(ICON_ADD)],
             _ => vec![],
         };
         if !items.is_empty() {

@@ -1,5 +1,8 @@
 //! Файловая система: быстрый список папки, диски, типы файлов, отображаемые имена
 
+#[allow(unused_imports)]
+use crate::i18n::{tr, trf};
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
@@ -141,13 +144,13 @@ pub fn for_each_child(dir: &Path, mut f: impl FnMut(&str, u32, u64, u64, u64)) -
 
 pub fn error_text(code: u32) -> String {
     if code == ERROR_ACCESS_DENIED.0 {
-        "Отказано в доступе".into()
+        tr("Отказано в доступе").into()
     } else if code == ERROR_PATH_NOT_FOUND.0 || code == ERROR_FILE_NOT_FOUND.0 {
-        "Расположение недоступно: путь не найден".into()
+        tr("Расположение недоступно: путь не найден").into()
     } else {
         let msg = windows::core::Error::from(windows::core::HRESULT::from_win32(code)).message();
         if msg.is_empty() {
-            format!("Ошибка {code}")
+            trf("Ошибка {}", &[&code])
         } else {
             msg
         }
@@ -277,11 +280,11 @@ pub fn type_name(ext: &str, is_dir: bool) -> String {
     let mut s = if r != 0 { from_wide(&info.szTypeName) } else { String::new() };
     if s.is_empty() {
         s = if is_dir {
-            "Папка с файлами".into()
+            tr("Папка с файлами").into()
         } else if ext.is_empty() {
-            "Файл".into()
+            tr("Файл").into()
         } else {
-            format!("Файл \"{}\"", ext.to_uppercase())
+            trf("Файл \"{}\"", &[&ext.to_uppercase()])
         };
     }
     cache.lock().unwrap().insert(key, s.clone());
@@ -323,7 +326,7 @@ pub fn drives(with_space: bool) -> Vec<Drive> {
                 free = avail;
             }
         }
-        let label = shell_display_name(Path::new(&root)).unwrap_or_else(|| format!("Локальный диск ({letter}:)"));
+        let label = shell_display_name(Path::new(&root)).unwrap_or_else(|| trf("Локальный диск ({}:)", &[&letter]));
         out.push(Drive { root: PathBuf::from(&root), letter, label, kind, total, free });
     }
     out
