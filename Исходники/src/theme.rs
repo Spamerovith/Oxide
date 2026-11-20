@@ -329,6 +329,10 @@ pub mod m {
     pub const T_HOVER: f32 = 0.083;
     pub const T_MENU: f32 = 0.167;
     pub const SEARCH_W: f32 = 220.0;
+    /// Полоса прокрутки: тонкая всегда видна, при наведении шире; ползунок не короче SCROLL_HANDLE_MIN
+    pub const SCROLL_W_IDLE: f32 = 6.0;
+    pub const SCROLL_W: f32 = 10.0;
+    pub const SCROLL_HANDLE_MIN: f32 = 48.0;
 }
 
 /// Читает системную палитру акцента (8 цветов: Light3..Dark3)
@@ -428,16 +432,21 @@ pub fn apply(ctx: &egui::Context, p: &Palette, animations: bool) {
         s.spacing.item_spacing = egui::vec2(8.0, 4.0);
         s.spacing.button_padding = egui::vec2(12.0, 6.0);
         s.spacing.interact_size.y = m::BTN_H;
+        // Полоса прокрутки как в Windows 11: тонкая видна всегда, при наведении расширяется,
+        // ползунок не короче m::SCROLL_HANDLE_MIN даже в папке с тысячами файлов
         let mut sc = egui::style::ScrollStyle::floating();
-        sc.bar_width = 6.0;
-        sc.floating_width = 2.0;
+        sc.floating_width = m::SCROLL_W_IDLE;
+        sc.bar_width = m::SCROLL_W;
         sc.floating_allocated_width = 0.0;
         sc.bar_inner_margin = 2.0;
         sc.bar_outer_margin = 2.0;
-        sc.foreground_color = false;
-        sc.dormant_handle_opacity = 0.45;
-        sc.active_handle_opacity = 0.8;
-        sc.interact_handle_opacity = 1.0;
+        sc.foreground_color = true;
+        sc.dormant_background_opacity = 0.0;
+        sc.active_background_opacity = 0.0;
+        sc.interact_background_opacity = 0.15;
+        sc.dormant_handle_opacity = 0.35;
+        sc.active_handle_opacity = 0.55;
+        sc.interact_handle_opacity = 0.75;
         s.spacing.scroll = sc;
         s.interaction.tooltip_delay = 0.6;
         s.interaction.selectable_labels = false;

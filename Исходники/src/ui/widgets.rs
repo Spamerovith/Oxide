@@ -308,3 +308,82 @@ pub fn paint_texture(p: &Painter, tex: &egui::TextureHandle, center: Pos2, max: 
     let rect = Rect::from_center_size(center, size);
     p.image(tex.id(), rect.round_to_pixels(p.pixels_per_point()), Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), Color32::WHITE);
 }
+
+/// Вертикальная прокрутка со своей полосой вместо полосы egui: у egui ползунок рисуется
+/// растянутым до минимальной длины, а перетаскивание считается по настоящему крошечному,
+/// поэтому в больших папках ползунок «вылетал» из-под мыши. `key` - постоянный ключ области
+pub fn vscroll<R>(ui: &mut Ui, sa: egui::ScrollArea, key: impl std::hash::Hash, pal: &Palette, f: impl FnOnce(&mut Ui, Rect) -> R) -> R {
+    let id = egui::Id::new(("oxide-vscroll", key));
+    let pending: Option<f32> = ui.data_mut(|d| d.remove_temp::<f32>(id.with("to")));
+    let mut sa = sa.scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden);
+    if let Some(o) = pending {
+        sa = sa.vertical_scroll_offset(o);
+    }
+    let out = sa.show_viewport(ui, f);
+    if let Some(o) = scrollbar(ui, id, out.inner_rect, out.content_size.y, out.state.offset.y, pal) {
+        ui.data_mut(|d| d.insert_temp(id.with("to"), o));
+        ui.ctx().request_repaint();
+    }
+    out.inner
+}
+
+/// Сбросить отложенную прокрутку области (при переходе в другую папку)
+pub fn vscroll_forget(ui: &Ui, key: impl std::hash::Hash) {
+    let id = egui::Id::new(("oxide-vscroll", key));
+    ui.data_mut(|d| d.remove_temp::<f32>(id.with("to")));
+}
+
+/// Полоса прокрутки как в Windows 11: тонкая видна всегда, при наведении шире.
+/// Ползунок не короче SCROLL_HANDLE_MIN, и тянется ровно тот ползунок, что нарисован.
+/// Щелчок по полосе выше или ниже ползунка листает на страницу. Возвращает новое смещение
+pub fn scrollbar(ui: &mut Ui, id: egui::Id, area: Rect, content: f32, offset: f32, pal: &Palette) -> Option<f32> {
+    let view = area.height();
+    if content <= view + 0.5 || view < 24.0 {
+        return None;
+    }
+    let max_off = content - view;
+    let pad = 2.0;
+    let track = Rect::from_min_max(Pos2::new(area.right() - m::SCROLL_W - pad * 2.0, area.top() + pad), Pos2::new(area.right(), area.bottom() - pad));
+    let len = (track.height() * view / content).max(m::SCROLL_HANDLE_MIN).min(track.height());
+    let travel = (track.height() - len).max(1.0);
+    let off = offset.clamp(0.0, max_off);
+    let top = track.top() + travel * off / max_off;
+    let resp = ui.interact(track, id, Sense::click_and_drag());
+    let grab_id = id.with("grab");
+    let mut new = None;
+    if resp.drag_started() {
+        if let Some(p) = resp.interact_pointer_pos() {
+            // Схватили ползунок - держим его за то же место; мимо - ползунок прыгает серединой под мышь
+            let g = if p.y >= top && p.y <= top + len { p.y - top } else { len / 2.0 };
+            ui.data_mut(|d| d.insert_temp(grab_id, g));
+        }
+    }
+    if resp.dragged() || resp.drag_started() {
+        if let (Some(p), Some(g)) = (resp.interact_pointer_pos(), ui.data(|d| d.get_temp::<f32>(grab_id))) {
+            let t = ((p.y - g - track.top()) / travel).clamp(0.0, 1.0);
+            new = Some(t * max_off);
+        }
+    } else if resp.clicked() {
+        if let Some(p) = resp.interact_pointer_pos() {
+            if p.y < top {
+                new = Some((off - view).max(0.0));
+            } else if p.y > top + len {
+                new = Some((off + view).min(max_off));
+            }
+        }
+    }
+    let active = resp.hovered() || resp.dragged();
+    let t = ui.ctx().animate_bool_with_time(id.with("w"), active, m::T_HOVER);
+    let w = m::SCROLL_W_IDLE + (m::SCROLL_W - m::SCROLL_W_IDLE) * t;
+    let draw_top = new.map(|n| track.top() + travel * n / max_off).unwrap_or(top);
+    let hr = Rect::from_min_size(Pos2::new(track.right() - pad - w, draw_top), Vec2::new(w, len));
+    let a = if resp.dragged() {
+        0.75
+    } else if resp.hovered() {
+        0.55
+    } else {
+        0.35
+    };
+    ui.painter().rect_filled(hr, CornerRadius::same((w / 2.0) as u8), pal.fill(pal.text.gamma_multiply(a)));
+    new
+}

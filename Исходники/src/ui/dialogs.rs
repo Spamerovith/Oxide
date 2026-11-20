@@ -143,7 +143,7 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
     let pal = app.pal.clone();
     ui.set_width(680.0);
     ui.label(egui::RichText::new(tr("Параметры")).font(font_sb(20.0)).color(pal.text));
-    egui::ScrollArea::vertical().max_height((ctx.screen_rect().height() - 200.0).max(240.0)).auto_shrink([false, true]).show(ui, |ui| {
+    vscroll(ui, egui::ScrollArea::vertical().max_height((ctx.screen_rect().height() - 200.0).max(240.0)).auto_shrink([false, true]), "settings", &pal, |ui, _| {
         ui.set_width(660.0);
         group_title(ui, &pal, tr("Интерфейс"));
         let card = Vec2::new(152.0, 128.0);
@@ -187,6 +187,29 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
                 }
             }
         });
+
+        group_title(ui, &pal, l("Проводник по умолчанию", "Default file manager"));
+        let mut def = app.settings.default_explorer;
+        if toggle(ui, &mut def, l("Открывать папки в Oxide", "Open folders in Oxide"), &pal).changed() {
+            match crate::shell::default_app::set(def) {
+                Ok(()) => {
+                    app.settings.default_explorer = def;
+                    app.mark_settings(&ctx);
+                }
+                Err(e) => app.toast = Some((e, crate::app::now(&ctx))),
+            }
+        }
+        ui.add(
+            egui::Label::new(
+                egui::RichText::new(l(
+                    "Папки и диски с рабочего стола, из ярлыков и других программ, «Показать в папке» из браузера. Перед удалением Oxide снимите галочку",
+                    "Folders and drives from the desktop, shortcuts and other apps, \"Show in folder\" from browsers. Turn this off before removing Oxide",
+                ))
+                .font(font(12.0))
+                .color(pal.text2),
+            )
+            .wrap(),
+        );
 
         group_title(ui, &pal, tr("Открывать проводник для"));
         ui.horizontal(|ui| {

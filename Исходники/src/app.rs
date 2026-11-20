@@ -418,7 +418,11 @@ impl OxideApp {
         let start = if after_update { None } else { start };
         let loc = match start {
             Some(a) if !a.is_empty() => {
-                let a = a.trim_matches('"').to_string();
+                let mut a = a.trim_matches('"').to_string();
+                // Корень диска приходит как «D:» (кавычка после «D:\» съедает обратную косую черту)
+                if a.len() == 2 && a.ends_with(':') {
+                    a.push(std::path::MAIN_SEPARATOR);
+                }
                 let p = PathBuf::from(&a);
                 if a.starts_with("::") || a.to_lowercase().starts_with("shell:") {
                     Location::from_arg(&a)

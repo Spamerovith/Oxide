@@ -276,16 +276,26 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let horizontal = view == ViewMode::List;
     let mut sa = if horizontal { egui::ScrollArea::horizontal() } else { egui::ScrollArea::vertical() };
     sa = sa.id_salt(("items", app.tabs[a].id, view as u8)).auto_shrink([false, false]);
+    let key = ("items", app.tabs[a].id, view as u8);
     if reset {
         sa = if horizontal { sa.horizontal_scroll_offset(0.0) } else { sa.vertical_scroll_offset(0.0) };
+        vscroll_forget(ui, key);
     }
+    let pal = app.pal.clone();
     ui.scope_builder(egui::UiBuilder::new().max_rect(area), |ui| {
         ui.set_clip_rect(area);
-        sa.show_viewport(ui, |ui, _vp| {
-            let avail = Vec2::new(area.width(), area.height());
+        let show = |ui: &mut Ui, _vp: Rect| {
+            // Без ширины полосы прокрутки, чтобы строки не заходили под неё
+            let avail = Vec2::new(ui.available_width().min(area.width()), area.height());
             let lay = layout(view, n, avail, compact, cols_w);
             body(app, ui, lay, view);
-        });
+        };
+        // Список листается вбок - там полоса egui; остальные виды - своя вертикальная полоса
+        if horizontal {
+            sa.show_viewport(ui, show);
+        } else {
+            vscroll(ui, sa, key, &pal, show);
+        }
     });
 }
 

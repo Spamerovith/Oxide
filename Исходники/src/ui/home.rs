@@ -166,7 +166,7 @@ pub fn home(app: &mut OxideApp, ui: &mut Ui) {
     let mut open_file: Option<String> = None;
     let mut menu: Option<(PathBuf, bool, Pos2)> = None;
     let mut file_menu: Option<(PathBuf, Pos2)> = None;
-    egui::ScrollArea::vertical().id_salt("home").auto_shrink([false, false]).show(ui, |ui| {
+    vscroll(ui, egui::ScrollArea::vertical().id_salt("home").auto_shrink([false, false]), "home", &pal, |ui, _| {
         let bg = page_begin(ui, "home");
         ui.add_space(8.0);
         let margin = 20.0;
@@ -305,7 +305,7 @@ pub fn this_pc(app: &mut OxideApp, ui: &mut Ui) {
     let ppp = ctx.pixels_per_point();
     let mut go: Option<Location> = None;
     let mut menu: Option<(PathBuf, Pos2)> = None;
-    egui::ScrollArea::vertical().id_salt("thispc").auto_shrink([false, false]).show(ui, |ui| {
+    vscroll(ui, egui::ScrollArea::vertical().id_salt("thispc").auto_shrink([false, false]), "thispc", &pal, |ui, _| {
         let bg = page_begin(ui, "thispc");
         ui.add_space(8.0);
         let margin = 20.0;

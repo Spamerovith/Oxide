@@ -59,6 +59,8 @@ pub struct Settings {
     /// None - язык ещё не выбран, при запуске будет вопрос
     pub language: Option<Lang>,
     pub check_updates: bool,
+    /// Папки, диски, Win+E и «Показать в папке» открываются в Oxide
+    pub default_explorer: bool,
 }
 
 impl Default for Settings {
@@ -89,6 +91,7 @@ impl Default for Settings {
             show_about_on_start: true,
             language: None,
             check_updates: true,
+            default_explorer: false,
         }
     }
 }

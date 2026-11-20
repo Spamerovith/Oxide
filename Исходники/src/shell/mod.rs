@@ -1,6 +1,7 @@
 //! Слой Windows: файловая система, значки, операции, меню оболочки, рамка окна
 
 pub mod clipboard;
+pub mod default_app;
 pub mod fs;
 pub mod menu;
 pub mod ops;

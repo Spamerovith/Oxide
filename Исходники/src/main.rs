@@ -20,6 +20,8 @@ fn main() -> eframe::Result<()> {
     let settings = settings::Settings::load();
     i18n::set(settings.language.unwrap_or_else(i18n::Lang::system));
     update::cleanup();
+    // Если Oxide.exe перенесли, а он открывает папки по умолчанию, обновить путь в реестре
+    shell::default_app::sync(settings.default_explorer);
     let start = std::env::args().nth(1);
 
     let icon = eframe::icon_data::from_png_bytes(include_bytes!("../assets/oxide.png")).ok();

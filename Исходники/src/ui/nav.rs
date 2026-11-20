@@ -146,7 +146,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let scroll_to = std::mem::take(&mut app.nav_scroll_to);
     let drag_hover = app.drag_hover.clone();
 
-    egui::ScrollArea::vertical().id_salt("nav").auto_shrink([false, false]).show(ui, |ui| {
+    vscroll(ui, egui::ScrollArea::vertical().id_salt("nav").auto_shrink([false, false]), "nav", &pal, |ui, _| {
         ui.add_space(4.0);
         let w = ui.available_width();
         for (i, row) in rows.iter().enumerate() {

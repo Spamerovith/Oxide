@@ -24,7 +24,7 @@ pub fn show(app: &mut OxideApp, ui: &mut Ui) {
     let mode = app.settings.pane;
     let sel: Vec<_> = app.tab().selected_entries().into_iter().cloned().collect();
     let ppp = ctx.pixels_per_point();
-    egui::ScrollArea::vertical().id_salt("pane").auto_shrink([false, false]).show(ui, |ui| {
+    vscroll(ui, egui::ScrollArea::vertical().id_salt("pane").auto_shrink([false, false]), "pane", &pal, |ui, _| {
         let w = ui.available_width();
         ui.add_space(16.0);
         if sel.is_empty() {

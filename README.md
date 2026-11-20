@@ -19,6 +19,7 @@
 - Семь тем: как в Windows, Windows 11 светлая и тёмная, Oxide, Графит, Северная ночь, Бумага
 - Русский и английский интерфейс: язык выбирается при первом запуске, поменять можно в параметрах
 - Обновления прямо из программы: когда на GitHub выходит новая версия, Oxide предлагает её установить
+- Можно открывать папки в Oxide вместо Проводника: с рабочего стола, из ярлыков и «Показать в папке» из браузера
 
 ## Установка
 
@@ -70,6 +71,8 @@ Oxide is a fast, lightweight file explorer for Windows written in Rust. It looks
 Windows 11 File Explorer, so there is nothing to relearn. The interface is available in English and
 Russian: pick the language on first launch and change it later in Options. Oxide checks this page for
 new versions and updates itself in place, keeping your settings, tabs, pinned folders and search index
+
+Oxide can also open folders instead of File Explorer, including "Show in folder" from browsers (Options, Default file manager)
 
 Download `Oxide.exe` from [Releases](../../releases) and run it, no installation needed. Requires
 Windows 10 or 11 (x64)
