@@ -145,6 +145,9 @@ const EN: &[(&str, &str)] = &[
     ("Прозрачность стекла", "Glass transparency"),
     ("Блики и переливы", "Highlights and shimmer"),
     ("Размывать то, что за окном", "Blur what's behind the window"),
+    ("Драйвер видеокарты не дал Oxide прозрачное окно, поэтому стекло непрозрачное. Обычно помогает обновление драйвера видеокарты", "The graphics driver didn't give Oxide a transparent window, so the glass is opaque. Updating the graphics driver usually helps"),
+    ("В Windows выключены эффекты прозрачности или включена экономия заряда, поэтому окно прозрачное, но без размытия", "Transparency effects are off in Windows or battery saver is on, so the window is transparent but not blurred"),
+    ("Открыть параметры Windows", "Open Windows Settings"),
     ("Быстрый доступ", "Quick access"),
     (
         "Быстрый проводник для Windows на Rust. Интерфейс повторяет Проводник Windows 11, а файловые операции выполняет сам движок Windows",

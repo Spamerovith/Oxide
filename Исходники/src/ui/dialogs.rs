@@ -212,6 +212,22 @@ fn settings(app: &mut OxideApp, ui: &mut Ui, keep: &mut bool) {
             let mut changed = slider(ui, &mut clarity, tr("Прозрачность стекла"), &pal).changed();
             changed |= slider(ui, &mut shine, tr("Блики и переливы"), &pal).changed();
             changed |= toggle(ui, &mut blur, tr("Размывать то, что за окном"), &pal).changed();
+            // Если на этом компьютере стекло работает не полностью - объясняем почему
+            let note = match app.glass_note {
+                Some(crate::app::GlassNote::NoAlpha) => Some((tr("Драйвер видеокарты не дал Oxide прозрачное окно, поэтому стекло непрозрачное. Обычно помогает обновление драйвера видеокарты"), false)),
+                Some(crate::app::GlassNote::NoBlur) => Some((tr("В Windows выключены эффекты прозрачности или включена экономия заряда, поэтому окно прозрачное, но без размытия"), true)),
+                None => None,
+            };
+            if let Some((text, settings_btn)) = note {
+                ui.add_space(4.0);
+                ui.add(egui::Label::new(egui::RichText::new(text).font(font(12.0)).color(pal.text2)).wrap());
+                if settings_btn {
+                    ui.add_space(4.0);
+                    if button(ui, tr("Открыть параметры Windows"), false, &pal, 0.0).clicked() {
+                        crate::shell::menu::open_url("ms-settings:colors");
+                    }
+                }
+            }
             if changed {
                 app.settings.glass_clarity = clarity;
                 app.settings.glass_shine = shine;

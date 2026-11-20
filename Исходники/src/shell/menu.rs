@@ -193,7 +193,8 @@ pub fn has_verb(names: &[String], verb: &str) -> bool {
 
 /// Открыть веб-страницу в браузере по умолчанию (только https)
 pub fn open_url(url: &str) -> bool {
-    if !url.starts_with("https://") {
+    // Только веб-ссылки и страницы параметров Windows
+    if !(url.starts_with("https://") || url.starts_with("ms-settings:")) {
         return false;
     }
     let f = wide(url);

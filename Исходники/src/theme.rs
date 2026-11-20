@@ -573,3 +573,18 @@ pub fn apply(ctx: &egui::Context, p: &Palette, animations: bool) {
         s.url_in_tooltip = false;
     });
 }
+
+/// Включены ли в Windows эффекты прозрачности. Если они выключены (или включена экономия заряда),
+/// Windows рисует размытие за окном непрозрачным
+pub fn system_transparency() -> bool {
+    let on = crate::util::reg_read_dword(
+        windows::Win32::System::Registry::HKEY_CURRENT_USER,
+        r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+        "EnableTransparency",
+    )
+    .map(|v| v != 0)
+    .unwrap_or(true);
+    let mut ps = windows::Win32::System::Power::SYSTEM_POWER_STATUS::default();
+    let saver = unsafe { windows::Win32::System::Power::GetSystemPowerStatus(&mut ps).is_ok() } && ps.SystemStatusFlag == 1;
+    on && !saver
+}

@@ -307,6 +307,10 @@ pub struct OxideApp {
     pub updater: crate::update::Updater,
     pub pal: Palette,
     pub system_dark: bool,
+    /// Видеокарта дала окну буфер с прозрачностью (без него стекло не может быть прозрачным)
+    pub gpu_alpha: bool,
+    /// Почему стекло работает не полностью: показывается в параметрах
+    pub glass_note: Option<GlassNote>,
     pub accent: Option<[egui::Color32; 8]>,
     pub animations: bool,
     pub tabs: Vec<Tab>,
@@ -370,6 +374,28 @@ impl OxideApp {
         let animations = theme::system_animations_enabled();
         let mut pal = Palette::resolve(settings.theme, system_dark, accent).tune_glass(settings.glass_clarity, settings.glass_shine);
 
+        // Есть ли у окна альфа-канал: некоторые драйверы видеокарт его не дают
+        let gpu_alpha = cc
+            .gl
+            .as_ref()
+            .map(|gl| unsafe {
+                use eframe::glow::{self, HasContext};
+                while gl.get_error() != 0 {}
+                let mut a = gl.get_framebuffer_attachment_parameter_i32(glow::FRAMEBUFFER, glow::BACK_LEFT, glow::FRAMEBUFFER_ATTACHMENT_ALPHA_SIZE);
+                if gl.get_error() != 0 {
+                    while gl.get_error() != 0 {}
+                    a = gl.get_parameter_i32(glow::ALPHA_BITS);
+                    if gl.get_error() != 0 {
+                        a = 8;
+                    }
+                }
+                a > 0
+            })
+            .unwrap_or(true);
+        let (glass_blur, glass_note) = glass_mode(&settings, gpu_alpha);
+        if glass_note == Some(GlassNote::NoAlpha) {
+            pal = pal.solid();
+        }
         let mut hwnd_ok = false;
         {
             use raw_window_handle::{HasWindowHandle, RawWindowHandle};
@@ -381,7 +407,7 @@ impl OxideApp {
                         window::set_outer_rect(hwnd, r);
                     }
                     window::set_dark(hwnd, pal.dark);
-                    if !window::set_glass(hwnd, pal.glass, settings.glass_blur) {
+                    if !window::set_glass(hwnd, pal.glass, glass_blur) {
                         pal = pal.solid();
                     }
                     hwnd_ok = true;
@@ -403,6 +429,8 @@ impl OxideApp {
             ops: Ops::new(ctx.clone()),
             pal,
             system_dark,
+            gpu_alpha,
+            glass_note,
             accent,
             animations,
             tabs: vec![],
@@ -2065,7 +2093,12 @@ impl OxideApp {
         self.accent = theme::system_accent_palette();
         self.animations = theme::system_animations_enabled();
         self.pal = Palette::resolve(self.settings.theme, self.system_dark, self.accent).tune_glass(self.settings.glass_clarity, self.settings.glass_shine);
-        if !self.hwnd_ok || !window::set_glass(window::hwnd(), self.pal.glass, self.settings.glass_blur) {
+        let (blur, note) = glass_mode(&self.settings, self.gpu_alpha);
+        self.glass_note = note;
+        if note == Some(GlassNote::NoAlpha) {
+            self.pal = std::mem::replace(&mut self.pal, Palette::light(None)).solid();
+        }
+        if !self.hwnd_ok || !window::set_glass(window::hwnd(), self.pal.glass, blur) {
             self.pal = std::mem::replace(&mut self.pal, Palette::light(None)).solid();
         }
         theme::apply(ctx, &self.pal, self.animations);
@@ -2195,4 +2228,27 @@ impl eframe::App for OxideApp {
         let c = self.pal.base;
         [c.r() as f32 / 255.0, c.g() as f32 / 255.0, c.b() as f32 / 255.0, 1.0]
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum GlassNote {
+    /// Драйвер видеокарты не дал окну прозрачность: стекло непрозрачное
+    NoAlpha,
+    /// В Windows выключены эффекты прозрачности или включена экономия заряда: окно прозрачное без размытия
+    NoBlur,
+}
+
+/// Как включать стекло на этом компьютере: (размывать ли, что сказать пользователю)
+fn glass_mode(s: &Settings, gpu_alpha: bool) -> (bool, Option<GlassNote>) {
+    if s.theme != ThemeChoice::Glass {
+        return (s.glass_blur, None);
+    }
+    if !gpu_alpha {
+        return (false, Some(GlassNote::NoAlpha));
+    }
+    if s.glass_blur && !theme::system_transparency() {
+        // Размытие Windows сейчас было бы непрозрачным - оставляем окно просто прозрачным
+        return (false, Some(GlassNote::NoBlur));
+    }
+    (s.glass_blur, None)
 }
